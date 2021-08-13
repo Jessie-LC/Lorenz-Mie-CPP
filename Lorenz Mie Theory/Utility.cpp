@@ -78,7 +78,7 @@ double sqr(double x) {
 }
 
 glm::dvec3 xyzToRGB(glm::dvec3 xyz) {
-	return xyzToRGBMatrix * xyz;
+	return xyz * xyzToRGBMatrix;
 }
 
 glm::dvec3 spectrumToXYZ(float w) {

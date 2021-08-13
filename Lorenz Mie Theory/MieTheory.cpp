@@ -133,27 +133,25 @@ unsigned int TermsToSum(const complex<double> z) {
 	return static_cast<unsigned int>(ceil(size + 4.3 * cbrt(size) + 1.0));
 }
 
-double ComputeMiePhase(complex<double> iorHost, complex<double> iorParticle, double cosTheta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Qabs, double& Qsca, double& Qext) {
+double ComputeMiePhase(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, valarray<complex<double>>& S1, valarray<complex<double>>& S2, double& Qabs, double& Qsca, double& Qext, double& sum, int angle) {
 	double size = 2.0 * pi * radius / lambda;
 	M = TermsToSum(iorHost * size);
 	AallN(hostA, iorHost * size);
 	AallN(particleA, iorParticle * size);
 
-	double sum = 0.0;
-
 	LorenzMie_ab(1, size, iorHost, iorParticle);
+
+	double cosTheta = cos(theta);
 
 	valarray<double> Pi;
 	valarray<double> Tau;
 	Pi.resize(M + 1);
 	Tau.resize(M + 1);
 	Pi[0] = 1.0;
-	Pi[1] = 3.0 * cosTheta;
 	Tau[0] = cosTheta;
-	Tau[1] = 2.0 * cosTheta * Pi[1] - 3.0;
-	for (int n = 2; n < M; ++n) {
-		Pi[n] = ((2.0 * (n + 1.0) - 1.0) / n) * cosTheta * Pi[n - 1] - ((n + 1.0) / n) * Pi[n - 2];
-		Tau[n] = (n + 1.0) * cosTheta * Pi[n] - (n + 2.0) * Pi[n - 1];
+	for (int n = 1; n < M; ++n) {
+		Pi[n] = computePi(cosTheta, n);
+		Tau[n] = computeTau(cosTheta, n);
 	}
 
 	for (unsigned int n = 1; n < M; ++n) {
@@ -161,14 +159,12 @@ double ComputeMiePhase(complex<double> iorHost, complex<double> iorParticle, dou
 		complex<double> b_n = b;
 
 		double tmp = (2.0 * n + 1.0) / (n * (n + 1.0));
-		S1 += tmp * (a_n * Pi[n] + b_n * Tau[n]);
-		S1 += tmp * (a_n * Tau[n] + b_n * Pi[n]);
+		S1[angle] += tmp * (a_n * Pi[n] + b_n * Tau[n]);
+		S1[angle] += tmp * (a_n * Tau[n] + b_n * Pi[n]);
 		sum += (2.0 * n + 1.0) * (sqr(abs(a_n)) + sqr(abs(b_n)));
 
 		LorenzMie_ab(n + 1, size, iorHost, iorParticle);
 	}
-	double phase = sqr(abs(S1)) + sqr(abs(S2));
-		   phase = phase / 4.0 * pi * sum;
 
-	return phase;
+	return 0.0;
 }
