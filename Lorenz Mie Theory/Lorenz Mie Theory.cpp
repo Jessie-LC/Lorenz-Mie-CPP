@@ -11,20 +11,18 @@ int main() {
 
 	cout << "Start generating Mie Phase:" << endl;
 
-	int n = 0;
 	int angle = 0;
-	for (int iteration = 0; iteration < iterations; ++iteration) {
-		n++;
+	for (int n = 0; n < iterations; ++n) {
 		angle++;
 
 		double dtheta { pi / iterations };
-		double theta = iteration * dtheta;
+		double theta = n * dtheta;
 
 		double radius = 1.0e-6;
 
 		complex<double> iorHost = { 1.00029, 0.0 };
 
-		complex<double> iorParticle = { 1.3330, 1.26e-9 };
+		complex<double> iorParticle = { 1.3330, 1.26e-4 };
 
 		glm::dvec3 phase = glm::dvec3(0.0);
 		glm::dvec3 scatteringCoefficient;
@@ -49,7 +47,7 @@ int main() {
 		extinctionCoefficient = xyzToRGB(extinctionCoefficient);
 		absorptionCoefficient = xyzToRGB(absorptionCoefficient);
 
-		cout << angle << "	" << phase.r << ", " << phase.g << ", " << phase.b << endl;
+		cout << angle << "	" << ComputeMiePhase(iorHost, iorParticle, theta, radius, 550e-9, S1, S2, Qabs, Qsca, Qext) << endl;
 
 		mieOutput << "	vec3(" << phase.r << ", " << phase.g << ", " << phase.b << ")," << endl;
 	}

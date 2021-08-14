@@ -339,3 +339,4 @@ ASALocalRun/
 # BeatPulse healthcheck temp database
 healthchecksdb
 Lorenz Mie Theory/Generate Mie Phase.txt
+*.txt
