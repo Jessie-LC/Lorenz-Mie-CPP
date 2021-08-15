@@ -149,11 +149,7 @@ double ComputeMiePhase(complex<double> iorHost, complex<double> iorParticle, dou
 	valarray<double> Tau;
 	Pi.resize(M + 1);
 	Tau.resize(M + 1);
-	Pi[0] = 1.0;
-	Pi[1] = 3.0 * cosTheta;
-	Tau[0] = cosTheta;
-	Tau[1] = 2.0 * cosTheta * Pi[1] - 3.0;
-	for (int n = 2; n < M; ++n) {
+	for (int n = 0; n < M; ++n) {
 		Pi[n] = computePi(cosTheta, n);
 		Tau[n] = computeTau(cosTheta, n);
 	}

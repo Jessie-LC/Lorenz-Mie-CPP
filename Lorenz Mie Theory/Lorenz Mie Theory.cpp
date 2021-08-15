@@ -18,7 +18,7 @@ int main() {
 		double dtheta { pi / iterations };
 		double theta = n * dtheta;
 
-		double radius = 1.0e-6;
+		double radius = 10.0e-6;
 
 		complex<double> iorHost = { 1.00029, 0.0 };
 
@@ -47,7 +47,7 @@ int main() {
 		extinctionCoefficient = xyzToRGB(extinctionCoefficient);
 		absorptionCoefficient = xyzToRGB(absorptionCoefficient);
 
-		cout << angle << "	" << ComputeMiePhase(iorHost, iorParticle, theta, radius, 550e-9, S1, S2, Qabs, Qsca, Qext) << endl;
+		cout << angle << "	vec3(" << phase.r << ", " << phase.g << ", " << phase.b << ")," << endl;
 
 		mieOutput << "	vec3(" << phase.r << ", " << phase.g << ", " << phase.b << ")," << endl;
 	}
