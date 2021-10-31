@@ -17,7 +17,7 @@ void AallN(valarray<complex<double>>& A, const complex<double>& z, unsigned int 
 
 	for (unsigned int n = M; n <= M; --n) {
 		complex<double> tmp = (n + 1.0) / z;
-		A[n] = tmp - 1.0 / (tmp + A[n + 1]);
+		A[n] = tmp - pow(tmp + A[n + 1], -1.0);
 	}
 }
 
@@ -30,7 +30,7 @@ complex<double> PsiZeta(unsigned int n, const complex<double>& z, const complex<
 	}
 	if (n == old_n + 1) {
 		complex<double> n_z = static_cast<double>(n) / z;
-		oldPsiZeta = oldPsiZeta * (n_z - A[n - 1])*(n_z * oldB);
+		oldPsiZeta = oldPsiZeta * (n_z - A[n - 1])*(n_z - oldB);
 		if (n == M) {
 			old_n = 0;
 		}
@@ -101,6 +101,20 @@ complex<double> R(unsigned int n, const complex<double>& z, valarray<complex<dou
 	return oldR;
 }
 
+complex<double> besselJ(int n, complex<double> x) {
+	int m = 64;
+	complex<double> mm = complex<double>(m), nn = complex<double>(n);
+	complex<double> s = 0.0, h = 0.5 * pi / mm;
+
+	for (int k = 0; k < m; k++)
+	{
+		complex<double> t = h * (complex<double>(k) + 0.5);
+		s += (((n & 1) == 1) ? (sin(x * sin(t)) * sin(nn * t)) : (cos(x * cos(t)) * cos(nn * t))) / mm;
+	}
+
+	return ((n & 1) == 1) ? s : (((((n >> 1) & 1) == 1) ? -1.0 : 1.0) * s);
+}
+
 void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, const complex<double>& iorParticle) {
 	static unsigned int old_n = 0;
 
@@ -133,7 +147,7 @@ unsigned int TermsToSum(const complex<double> z) {
 	return static_cast<unsigned int>(ceil(size + 4.3 * cbrt(size) + 1.0));
 }
 
-double ComputeMiePhase(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Qabs, double& Qsca, double& Qext) {
+double ComputeParticlePhase(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Qabs, double& Qsca, double& Qext) {
 	double size = 2.0 * pi * radius / lambda;
 	M = TermsToSum(iorHost * size);
 	AallN(hostA, iorHost * size);
@@ -154,18 +168,72 @@ double ComputeMiePhase(complex<double> iorHost, complex<double> iorParticle, dou
 		Tau[n] = computeTau(cosTheta, n);
 	}
 
+	complex<double> term = { 0.0, 0.0 };
 	for (unsigned int n = 1; n < M; ++n) {
 		complex<double> a_n = a;
 		complex<double> b_n = b;
 
-		double tmp = (2.0 * n + 1.0) / ((n + 1.0) * (n + 2.0));
-		S1 += tmp * (a_n * Pi[n] + b_n * Tau[n]);
-		S1 += tmp * (a_n * Tau[n] + b_n * Pi[n]);
+		double tmp = (2.0 * n + 1.0) / (n * (n + 1.0));
+		S1 += tmp * (a_n * Pi[n] + b_n * Tau[n]) / (iorHost * iorHost);
+		S2 += tmp * (a_n * Tau[n] + b_n * Pi[n]) / (iorHost * iorHost);
 		sum += (2.0 * n + 1.0) * (sqr(abs(a_n)) + sqr(abs(b_n)));
+
+		double alpha = 4.0 * pi * radius * imag(iorHost) / lambda;
+		double y = (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
+		double term1 = pow(lambda, 2.0) * exp(-(4.0 * pi * radius * imag(iorHost) / pow(lambda, 2.0)));
+		double term2 = 2.0 * pi * y * pow(abs(iorHost), 2.0);
+		Qsca += tmp * (abs(a_n) + abs(b_n));
+
+		term += tmp * (a_n + b_n) / (iorHost * iorHost);
 
 		LorenzMie_ab(n + 1, size, iorHost, iorParticle);
 	}
 	double phase = (sqr(abs(S1)) + sqr(abs(S2))) / (4.0 * pi * sum);
+
+	double scale = lambda * lambda / (2.0 * pi);
+	Qext = scale * real(term);
+	double alpha = 2.0 * size * iorHost.imag();
+	Qsca *= scale * exp(-alpha) * (alpha > 1.0e-6
+		? alpha * alpha / (2.0 * (1.0 + (alpha - 1.0) * exp(alpha)))
+		: 1.0);
+	Qsca /= abs(iorHost);
+	Qabs = Qext - Qsca;
+
+	return phase;
+}
+
+double ComputeMediumPhase(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle) {
+	/*
+		https://cseweb.ucsd.edu//~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf
+
+		Secontion 2.2: Bulk Optical Properties
+
+		Something in this function is wrong, but I am not entirely sure what.
+	*/
+	float phase = 0.0;
+	int counter = 0;
+	for (double r = particle.rMin + particle.stepSize * 0.5; r < particle.rMax; r += particle.stepSize) {
+		complex<double> S1;
+		complex<double> S2;
+		double Qsca;
+		double Qabs;
+		double Qext;
+		double particlePhase = ComputeParticlePhase(iorHost, particle.ior, theta, r, lambda, S1, S2, Qabs, Qsca, Qext);
+
+		double sigmaS = Qsca * particle.N[counter] * particle.stepSize;
+
+		double phaseI = Qsca * particlePhase * particle.stepSize;
+			   phaseI = (1.0 / sigmaS) * phaseI;
+
+		particle.scattering += sigmaS;
+		particle.absorption += Qabs * particle.N[counter] * particle.stepSize;
+		particle.extinction += Qext * particle.N[counter] * particle.stepSize;
+		phase += sigmaS * phaseI;
+
+		++counter;
+	}
+	particle.scattering /= counter;
+	phase /= particle.scattering;
 
 	return phase;
 }

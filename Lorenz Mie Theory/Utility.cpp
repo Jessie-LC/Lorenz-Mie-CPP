@@ -81,7 +81,7 @@ glm::dvec3 xyzToRGB(glm::dvec3 xyz) {
 	return xyz * xyzToRGBMatrix;
 }
 
-glm::dvec3 spectrumToXYZ(float w) {
+glm::dvec3 spectrumToXYZ(glm::dvec3 spectrum, float w) {
 	float n = (w - 390.0);
 	int i = int(n);
 	if (i < 0 || i >= (830 - 390)) {
@@ -93,6 +93,11 @@ glm::dvec3 spectrumToXYZ(float w) {
 		glm::dvec3 c0 = cie[n0];
 		glm::dvec3 c1 = cie[n1];
 
-		return mix(c0, c1, n);
+		glm::dvec3 xyz = mix(c0, c1, n);
+
+		xyz = xyz * spectrum;
+
+		//Normalize the conversion
+		return xyz * 441.0 / glm::dvec3(113.042);
 	}
 }
