@@ -176,8 +176,8 @@ double ComputeParticlePhase(complex<double> iorHost, complex<double> iorParticle
 		complex<double> b_n = b;
 
 		double tmp = (2.0 * n + 1.0) / (n * (n + 1.0));
-		S1 += tmp * (a_n * Pi[n] + b_n * Tau[n]) / (iorHost * iorHost);
-		S2 += tmp * (a_n * Tau[n] + b_n * Pi[n]) / (iorHost * iorHost);
+		S1 += tmp * (a_n * Pi[n] + b_n * Tau[n]);// / (iorHost * iorHost);
+		S2 += tmp * (a_n * Tau[n] + b_n * Pi[n]);// / (iorHost * iorHost);
 		sum += (2.0 * n + 1.0) * (sqr(abs(a_n)) + sqr(abs(b_n)));
 
 		Qsca += (2.0 * n + 1.0) * (pow(abs(a_n), 2.0) + pow(abs(b_n), 2.0));
