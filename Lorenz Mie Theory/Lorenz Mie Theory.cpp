@@ -72,21 +72,23 @@ int main() {
 	double scatteringCoefficient, extinctionCoefficient, absorptionCoefficient;
 	//tie(extinctionCoefficient, scatteringCoefficient, absorptionCoefficient, S1, S2) = MiePhase(550.0, iorHost, algae.ior, radius);
 
+	double lambda = 0.550e-6;
 	for (int n = 0; n < angles; ++n) {
 		double dtheta{ pi / angles };
 		double theta = n * dtheta;
 		BulkMedium bulk_A;
 		BulkMedium bulk_M;
-		ComputeBulkOpticalProperties(iorHost, theta, 550e-9, algae, bulk_A);
-		ComputeBulkOpticalProperties(iorHost, theta, 550e-9, mineral, bulk_M);
+		ComputeBulkOpticalProperties(iorHost, theta, lambda, algae, bulk_A);
+		ComputeBulkOpticalProperties(iorHost, theta, lambda, mineral, bulk_M);
 
-		double extinction = bulk_A.extinction + bulk_M.extinction;
+		double absorptionMedium = 4.0 * pi * imag(iorHost) / lambda;
+		double extinction = absorptionMedium + (bulk_A.extinction + bulk_M.extinction);
 		double scattering = bulk_A.scattering + bulk_M.scattering;
 		double absorption = bulk_A.absorption + bulk_M.absorption;
 		double phase = (1.0 / scattering) * ((bulk_A.phase * bulk_A.scattering) + (bulk_M.phase * bulk_M.scattering));
 
-		mieOutput << absorption << "," << endl;
-		std::cout << absorption << endl;
+		mieOutput << phase << "," << endl;
+		std::cout << phase << endl;
 	}
 
 	//vec3(0.0160536, 0.0177289, 0.019914)
