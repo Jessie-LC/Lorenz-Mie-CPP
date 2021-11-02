@@ -91,9 +91,6 @@ int main() {
 		std::cout << phase << endl;
 	}
 
-	//vec3(0.0160536, 0.0177289, 0.019914)
-	//vec3(1.2485e-04, 1.44216e-04, 1.71139e-04)
-
 	std::cout << "Finished generating Mie Phase" << endl;
 	mieOutput << ");" << endl;
 	mieOutput.close();
