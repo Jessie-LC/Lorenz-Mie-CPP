@@ -16,7 +16,6 @@ struct LogNormalParticleDistribution {
 };
 
 struct ParticleDistribution {
-	double extinction, scattering, absorption;
 	complex<double> ior;
 	double rMin, rMax;
 	double stepSize;
@@ -26,6 +25,7 @@ struct ParticleDistribution {
 };
 
 struct BulkMedium {
+	double extinction, scattering, absorption;
 	double phase;
 };
 

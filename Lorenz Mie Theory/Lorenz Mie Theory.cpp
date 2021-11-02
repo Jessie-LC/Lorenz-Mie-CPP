@@ -115,37 +115,6 @@ double MiePhase(double wl, complex<double> iorHost, complex<double> iorParticle,
 	return Qext;
 }
 
-/*
-double ComputeMediumPhase(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle) {
-	float phase = 0.0;
-	int counter = 0;
-	for (double r = particle.rMin + particle.stepSize * 0.5; r < particle.rMax; r += particle.stepSize) {
-		complex<double> S1;
-		complex<double> S2;
-		double Qsca;
-		double Qabs;
-		double Qext;
-		double particlePhase = ComputeParticlePhase(iorHost, particle.ior, theta, r, lambda, S1, S2, Qabs, Qsca, Qext);
-
-		double sigmaS = Qsca * particle.N[counter] * particle.stepSize;
-
-		double phaseI = Qsca * particlePhase * particle.stepSize;
-		phaseI = (1.0 / sigmaS) * phaseI;
-
-		particle.scattering += sigmaS;
-		particle.absorption += Qabs * particle.N[counter] * particle.stepSize;
-		particle.extinction += Qext * particle.N[counter] * particle.stepSize;
-		phase += sigmaS * phaseI;
-
-		++counter;
-	}
-	particle.scattering /= counter;
-	phase /= particle.scattering;
-
-	return phase;
-}
-*/
-
 int main() {
 	ofstream mieOutput;
 	mieOutput.open("Generate Mie Phase.txt");
@@ -180,9 +149,6 @@ int main() {
 	}
 
 	ParticleDistribution mineral{
-		0.0,
-		0.0,
-		0.0,
 		complex<double>{ 1.58, 3.61e-4 },
 		rMin_mineral,
 		rMax_mineral,
@@ -196,9 +162,6 @@ int main() {
 	};
 
 	ParticleDistribution algae{
-		0.0,
-		0.0,
-		0.0,
 		complex<double>{ 1.41, 8.19e-5 },
 		rMin_algae,
 		rMax_algae,
@@ -221,7 +184,7 @@ int main() {
 		double theta = n * dtheta;
 		BulkMedium bulk;
 		ComputeMediumPhase(iorHost, theta, 550e-9, algae, bulk);
-		std::cout << algae.scattering << endl;
+		std::cout << bulk.scattering << endl;
 		//std::cout << S1[n] << endl;
 	}
 

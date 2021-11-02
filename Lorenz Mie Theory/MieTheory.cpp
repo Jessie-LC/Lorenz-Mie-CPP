@@ -139,6 +139,9 @@ void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, c
 
 	complex<double> B_n = B(n, hostZ, hostA);
 	complex<double> R_n = R(n, hostZ, hostA);
+
+	a = R_n * (iorHost * particleA[n] - iorParticle * hostA[n]) / (iorHost * particleA[n] - iorParticle * B_n);
+	b = R_n * (iorParticle * particleA[n] - iorHost * hostA[n]) / (iorParticle * particleA[n] - iorHost * B_n);
 }
 
 unsigned int TermsToSum(const complex<double> z) {
@@ -205,7 +208,9 @@ void ComputeMediumPhase(complex<double> iorHost, double theta, double lambda, Pa
 
 		Something in this function is wrong, but I am not entirely sure what.
 	*/
-	float phase = 0.0;
+	double phase = 0.0;
+	double scatteringSigma = 0.0;
+	double extinctionSigma = 0.0;
 	int counter = 0;
 	for (double r = particle.rMin + particle.stepSize * 0.5; r < particle.rMax; r += particle.stepSize) {
 		complex<double> S1;
@@ -220,17 +225,18 @@ void ComputeMediumPhase(complex<double> iorHost, double theta, double lambda, Pa
 		double phaseI = Qsca * particlePhase * particle.stepSize;
 			   phaseI = (1.0 / sigmaS) * phaseI;
 
-		particle.scattering += sigmaS;
-		particle.extinction += Qext * particle.N[counter] * particle.stepSize;
+		scatteringSigma += sigmaS;
+		extinctionSigma += Qext * particle.N[counter] * particle.stepSize;
 		phase += sigmaS * phaseI;
 
 		++counter;
 	}
-	particle.scattering /= counter;
-	particle.extinction /= counter;
-	particle.absorption = particle.extinction - particle.scattering;
-
-	phase /= particle.scattering;
+	scatteringSigma /= counter;
+	extinctionSigma /= counter;
+	phase /= scatteringSigma;
 
 	bulk.phase = phase;
+	bulk.scattering = scatteringSigma;
+	bulk.extinction = extinctionSigma;
+	bulk.absorption = extinctionSigma - scatteringSigma;
 }
