@@ -79,7 +79,13 @@ int main() {
 		BulkMedium bulk_M;
 		ComputeBulkOpticalProperties(iorHost, theta, 420e-9, algae, bulk_A);
 		ComputeBulkOpticalProperties(iorHost, theta, 420e-9, mineral, bulk_M);
-		std::cout << bulk_A.extinction + bulk_M.extinction << endl;
+
+		double extinction = bulk_A.extinction + bulk_M.extinction;
+		double scattering = bulk_A.scattering + bulk_M.scattering;
+		double absorption = bulk_A.absorption + bulk_M.absorption;
+		double phase = ((bulk_A.phase * bulk_A.scattering) + (bulk_M.phase * bulk_M.scattering)) / scattering;
+
+		std::cout << scattering << endl;
 	}
 
 	std::cout << "Finished generating Mie Phase" << endl;
