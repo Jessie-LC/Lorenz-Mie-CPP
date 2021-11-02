@@ -197,7 +197,7 @@ void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double 
 
 		Secontion 2.2: Bulk Optical Properties
 
-		Something in this function is wrong, but I am not entirely sure what. That or the issue is in ComputeParticlePhase(), but I think that function is correct.
+		Something in this function is wrong, but I am not entirely sure what. That or the issue is in ComputeParticleProperties(), but I think that function is correct.
 	*/
 	double phase = 0.0;
 	double scatteringSigma = 0.0;
