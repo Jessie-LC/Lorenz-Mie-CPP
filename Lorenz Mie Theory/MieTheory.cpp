@@ -1,6 +1,8 @@
 #include "Utility.h"
 #include "MieTheory.h"
 
+#include "besselComplex.hpp"
+
 unsigned int M = 0u;
 valarray<complex<double>> particleA;
 valarray<complex<double>> hostA;
@@ -137,9 +139,6 @@ void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, c
 
 	complex<double> B_n = B(n, hostZ, hostA);
 	complex<double> R_n = R(n, hostZ, hostA);
-
-	a = R_n * (iorHost * particleA[n] - iorParticle * hostA[n]) / (iorHost * particleA[n] - iorParticle * B_n);
-	b = R_n * (iorParticle * particleA[n] - iorHost * hostA[n]) / (iorParticle * particleA[n] - iorHost * B_n);
 }
 
 unsigned int TermsToSum(const complex<double> z) {
@@ -178,31 +177,27 @@ double ComputeParticlePhase(complex<double> iorHost, complex<double> iorParticle
 		S2 += tmp * (a_n * Tau[n] + b_n * Pi[n]) / (iorHost * iorHost);
 		sum += (2.0 * n + 1.0) * (sqr(abs(a_n)) + sqr(abs(b_n)));
 
-		double alpha = 4.0 * pi * radius * imag(iorHost) / lambda;
-		double y = (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
-		double term1 = pow(lambda, 2.0) * exp(-(4.0 * pi * radius * imag(iorHost) / pow(lambda, 2.0)));
-		double term2 = 2.0 * pi * y * pow(abs(iorHost), 2.0);
-		Qsca += tmp * (abs(a_n) + abs(b_n));
-
-		term += tmp * (a_n + b_n) / (iorHost * iorHost);
+		Qsca += (2.0 * n + 1.0) * (pow(abs(a_n), 2.0) + pow(abs(b_n), 2.0));
+		Qext += (2.0 * n + 1.0) * real((a_n + b_n) / (iorHost * iorHost));
 
 		LorenzMie_ab(n + 1, size, iorHost, iorParticle);
 	}
 	double phase = (sqr(abs(S1)) + sqr(abs(S2))) / (4.0 * pi * sum);
 
-	double scale = lambda * lambda / (2.0 * pi);
-	Qext = scale * real(term);
-	double alpha = 2.0 * size * iorHost.imag();
-	Qsca *= scale * exp(-alpha) * (alpha > 1.0e-6
-		? alpha * alpha / (2.0 * (1.0 + (alpha - 1.0) * exp(alpha)))
-		: 1.0);
-	Qsca /= abs(iorHost);
+	double alpha = 4.0 * pi * radius * imag(iorHost) / lambda;
+	double _y = (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
+	double term1 = pow(lambda, 2.0) * exp(-(4.0 * pi * radius * imag(iorHost) / pow(lambda, 2.0)));
+	double term2 = 2.0 * pi * _y * pow(abs(iorHost), 2.0);
+
+	Qsca = (term1 / term2) * Qsca;
+	Qext = (pow(lambda, 2.0) / tau) * Qext;
+
 	Qabs = Qext - Qsca;
 
 	return phase;
 }
 
-double ComputeMediumPhase(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle) {
+void ComputeMediumPhase(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle, BulkMedium& bulk) {
 	/*
 		https://cseweb.ucsd.edu//~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf
 
@@ -226,14 +221,16 @@ double ComputeMediumPhase(complex<double> iorHost, double theta, double lambda, 
 			   phaseI = (1.0 / sigmaS) * phaseI;
 
 		particle.scattering += sigmaS;
-		particle.absorption += Qabs * particle.N[counter] * particle.stepSize;
 		particle.extinction += Qext * particle.N[counter] * particle.stepSize;
 		phase += sigmaS * phaseI;
 
 		++counter;
 	}
 	particle.scattering /= counter;
+	particle.extinction /= counter;
+	particle.absorption = particle.extinction - particle.scattering;
+
 	phase /= particle.scattering;
 
-	return phase;
+	bulk.phase = phase;
 }

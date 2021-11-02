@@ -1,3 +1,1 @@
 const vec3 mieData[] = vec3[](
-	vec3(-nan(ind), -nan(ind), -nan(ind)),
-	vec3(-nan(ind), -nan(ind), -nan(ind)),
