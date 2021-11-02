@@ -103,20 +103,6 @@ complex<double> R(unsigned int n, const complex<double>& z, valarray<complex<dou
 	return oldR;
 }
 
-complex<double> besselJ(int n, complex<double> x) {
-	int m = 64;
-	complex<double> mm = complex<double>(m), nn = complex<double>(n);
-	complex<double> s = 0.0, h = 0.5 * pi / mm;
-
-	for (int k = 0; k < m; k++)
-	{
-		complex<double> t = h * (complex<double>(k) + 0.5);
-		s += (((n & 1) == 1) ? (sin(x * sin(t)) * sin(nn * t)) : (cos(x * cos(t)) * cos(nn * t))) / mm;
-	}
-
-	return ((n & 1) == 1) ? s : (((((n >> 1) & 1) == 1) ? -1.0 : 1.0) * s);
-}
-
 void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, const complex<double>& iorParticle) {
 	static unsigned int old_n = 0;
 
@@ -149,7 +135,14 @@ unsigned int TermsToSum(const complex<double> z) {
 	return static_cast<unsigned int>(ceil(size + 4.3 * cbrt(size) + 1.0));
 }
 
-double ComputeParticlePhase(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Qabs, double& Qsca, double& Qext) {
+void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Qabs, double& Qsca, double& Qext, double& phase) {
+	/*
+		https://cseweb.ucsd.edu//~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf
+
+		Secontion 2: Scattering in Participating Media
+
+		I think everything here is correct. I think.
+	*/
 	double size = 2.0 * pi * radius / lambda;
 	M = TermsToSum(iorHost * size);
 	AallN(hostA, iorHost * size);
@@ -185,7 +178,7 @@ double ComputeParticlePhase(complex<double> iorHost, complex<double> iorParticle
 
 		LorenzMie_ab(n + 1, size, iorHost, iorParticle);
 	}
-	double phase = (sqr(abs(S1)) + sqr(abs(S2))) / (4.0 * pi * sum);
+	phase = (sqr(abs(S1)) + sqr(abs(S2))) / (4.0 * pi * sum);
 
 	double alpha = 4.0 * pi * radius * imag(iorHost) / lambda;
 	double _y = (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
@@ -196,17 +189,15 @@ double ComputeParticlePhase(complex<double> iorHost, complex<double> iorParticle
 	Qext = (pow(lambda, 2.0) / tau) * Qext;
 
 	Qabs = Qext - Qsca;
-
-	return phase;
 }
 
-void ComputeMediumPhase(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle, BulkMedium& bulk) {
+void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle, BulkMedium& bulk) {
 	/*
 		https://cseweb.ucsd.edu//~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf
 
 		Secontion 2.2: Bulk Optical Properties
 
-		Something in this function is wrong, but I am not entirely sure what.
+		Something in this function is wrong, but I am not entirely sure what. That or the issue is in ComputeParticlePhase(), but I think that function is correct.
 	*/
 	double phase = 0.0;
 	double scatteringSigma = 0.0;
@@ -218,22 +209,18 @@ void ComputeMediumPhase(complex<double> iorHost, double theta, double lambda, Pa
 		double Qsca;
 		double Qabs;
 		double Qext;
-		double particlePhase = ComputeParticlePhase(iorHost, particle.ior, theta, r, lambda, S1, S2, Qabs, Qsca, Qext);
+		double particlePhase;
+		ComputeParticleProperties(iorHost, particle.ior, theta, r, lambda, S1, S2, Qabs, Qsca, Qext, particlePhase);
 
 		double sigmaS = Qsca * particle.N[counter] * particle.stepSize;
 
-		double phaseI = Qsca * particlePhase * particle.stepSize;
-			   phaseI = (1.0 / sigmaS) * phaseI;
-
 		scatteringSigma += sigmaS;
 		extinctionSigma += Qext * particle.N[counter] * particle.stepSize;
-		phase += sigmaS * phaseI;
+		phase += Qsca * particlePhase * particle.stepSize;
 
 		++counter;
 	}
-	scatteringSigma /= counter;
-	extinctionSigma /= counter;
-	phase /= scatteringSigma;
+	phase = (1.0 / scatteringSigma) * phase;
 
 	bulk.phase = phase;
 	bulk.scattering = scatteringSigma;
