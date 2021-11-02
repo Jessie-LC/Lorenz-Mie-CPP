@@ -70,7 +70,8 @@ double derivativePi(double x, int n) {
 }
 
 double computeTau(double mu, int n) {
-	return mu * computePi(mu, n) - (1.0 - pow(mu, 2.0)) * derivativePi(mu, n);
+	double mu_sin = sin(acos(mu));
+	return mu * computePi(mu, n) - pow(mu_sin, 2.0) * derivativePi(mu, n);
 }
 
 double sqr(double x) {

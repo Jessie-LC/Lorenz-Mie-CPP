@@ -141,7 +141,7 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 
 		Secontion 2: Scattering in Participating Media
 
-		I think everything here is correct. I think.
+		Something is wrong with this function, and/or the functions it calls.
 	*/
 	double size = 2.0 * pi * radius / lambda;
 	M = TermsToSum(iorHost * size);
@@ -154,41 +154,39 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 
 	double cosTheta = cos(theta);
 
-	valarray<double> Pi;
-	valarray<double> Tau;
-	Pi.resize(M + 1);
-	Tau.resize(M + 1);
-	for (int n = 0; n < M; ++n) {
-		Pi[n] = computePi(cosTheta, n);
-		Tau[n] = computeTau(cosTheta, n);
-	}
-
 	complex<double> term = { 0.0, 0.0 };
+
+	double crossSectionEXT = 0.0;
 	for (unsigned int n = 1; n < M; ++n) {
+		double PiN = computePi(cosTheta, n);
+		double TauN = computeTau(cosTheta, n);
+
 		complex<double> a_n = a;
 		complex<double> b_n = b;
 
 		double tmp = (2.0 * n + 1.0) / (n * (n + 1.0));
-		S1 += tmp * (a_n * Pi[n] + b_n * Tau[n]);// / (iorHost * iorHost);
-		S2 += tmp * (a_n * Tau[n] + b_n * Pi[n]);// / (iorHost * iorHost);
+		S1 += tmp * (a_n * PiN + b_n * TauN);// / (iorHost * iorHost);
+		S2 += tmp * (a_n * TauN + b_n * PiN);// / (iorHost * iorHost);
 		sum += (2.0 * n + 1.0) * (sqr(abs(a_n)) + sqr(abs(b_n)));
 
-		Qsca += (2.0 * n + 1.0) * (pow(abs(a_n), 2.0) + pow(abs(b_n), 2.0));
-		Qext += (2.0 * n + 1.0) * real((a_n + b_n) / (iorHost * iorHost));
+		crossSectionEXT += (2.0 * n + 1.0) * real((a_n + b_n) / (iorHost * iorHost));
 
 		LorenzMie_ab(n + 1, size, iorHost, iorParticle);
 	}
-	phase = (sqr(abs(S1)) + sqr(abs(S2))) / (4.0 * pi * sum);
 
 	double alpha = 4.0 * pi * radius * imag(iorHost) / lambda;
-	double _y = (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
-	double term1 = pow(lambda, 2.0) * exp(-(4.0 * pi * radius * imag(iorHost) / pow(lambda, 2.0)));
-	double term2 = 2.0 * pi * _y * pow(abs(iorHost), 2.0);
+	double y = alpha < 10e-6 ? 1.0 : (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
+	double term1 = pow(lambda, 2.0) * exp(-alpha);
+	double term2 = 2.0 * pi * y * pow(abs(iorHost), 2.0);
 
-	Qsca = (term1 / term2) * Qsca;
-	Qext = (pow(lambda, 2.0) / tau) * Qext;
+	Qsca = term1 / term2 * sum;
+	Qext = (pow(lambda, 2.0) / tau) * crossSectionEXT;
 
 	Qabs = Qext - Qsca;
+
+	complex<double> k = 2.0 * pi * iorHost / lambda;
+
+	phase = (sqr(abs(S1)) + sqr(abs(S2))) / (2.0 * sqr(abs(k)) * Qsca);
 }
 
 void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle, BulkMedium& bulk) {
@@ -196,8 +194,6 @@ void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double 
 		https://cseweb.ucsd.edu//~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf
 
 		Secontion 2.2: Bulk Optical Properties
-
-		Something in this function is wrong, but I am not entirely sure what. That or the issue is in ComputeParticleProperties(), but I think that function is correct.
 	*/
 	double phase = 0.0;
 	double scatteringSigma = 0.0;

@@ -17,7 +17,7 @@ int main() {
 
 	double radius = 10.0e-6;
 
-	complex<double> iorHost = { 1.34, 1.4e-9 };
+	complex<double> iorHost = complex<double>(1.33257, 1.67E-08);
 
 	double rMax_mineral = 100e-6;
 	double rMin_mineral = 0.01e-6;
@@ -76,16 +76,28 @@ int main() {
 		double dtheta{ pi / angles };
 		double theta = n * dtheta;
 		BulkMedium bulk_A;
-		BulkMedium bulk_M;
-		ComputeBulkOpticalProperties(iorHost, theta, 420e-9, algae, bulk_A);
-		ComputeBulkOpticalProperties(iorHost, theta, 420e-9, mineral, bulk_M);
+		ComputeBulkOpticalProperties(iorHost, theta, 650e-9, algae, bulk_A);
+		//ComputeBulkOpticalProperties(iorHost, theta, 420e-9, mineral, bulk_M);
 
+		/*
+		complex<double> S1;
+		complex<double> S2;
+		double Qsca;
+		double Qabs;
+		double Qext;
+		double particlePhase;
+		ComputeParticleProperties(iorHost, complex<double>(1.33257, 1.67E-08), theta, 10e-6, 0.65e-6, S1, S2, Qabs, Qsca, Qext, particlePhase);
+		*/
+
+		/*
 		double extinction = bulk_A.extinction + bulk_M.extinction;
 		double scattering = bulk_A.scattering + bulk_M.scattering;
 		double absorption = bulk_A.absorption + bulk_M.absorption;
 		double phase = ((bulk_A.phase * bulk_A.scattering) + (bulk_M.phase * bulk_M.scattering)) / scattering;
+		*/
 
-		std::cout << scattering << endl;
+		mieOutput << bulk_A.scattering << "," << endl;
+		std::cout << bulk_A.scattering << endl;
 	}
 
 	std::cout << "Finished generating Mie Phase" << endl;
