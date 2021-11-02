@@ -212,13 +212,12 @@ void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double 
 
 		scatteringSigma += sigmaS;
 		extinctionSigma += Qext * particle.N[counter] * particle.stepSize;
-		phase += Qsca * particlePhase * particle.stepSize;
+		phase += Qsca * particlePhase * particle.N[counter] * particle.stepSize;
 
 		++counter;
 	}
-	phase = (1.0 / scatteringSigma) * phase;
 
-	bulk.phase = phase;
+	bulk.phase = (1.0 / scatteringSigma) * phase;
 	bulk.scattering = scatteringSigma;
 	bulk.extinction = extinctionSigma;
 	bulk.absorption = extinctionSigma - scatteringSigma;

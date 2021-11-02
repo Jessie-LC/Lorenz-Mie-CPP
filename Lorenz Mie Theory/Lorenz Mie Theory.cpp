@@ -76,29 +76,21 @@ int main() {
 		double dtheta{ pi / angles };
 		double theta = n * dtheta;
 		BulkMedium bulk_A;
-		ComputeBulkOpticalProperties(iorHost, theta, 650e-9, algae, bulk_A);
-		//ComputeBulkOpticalProperties(iorHost, theta, 420e-9, mineral, bulk_M);
+		BulkMedium bulk_M;
+		ComputeBulkOpticalProperties(iorHost, theta, 550e-9, algae, bulk_A);
+		ComputeBulkOpticalProperties(iorHost, theta, 550e-9, mineral, bulk_M);
 
-		/*
-		complex<double> S1;
-		complex<double> S2;
-		double Qsca;
-		double Qabs;
-		double Qext;
-		double particlePhase;
-		ComputeParticleProperties(iorHost, complex<double>(1.33257, 1.67E-08), theta, 10e-6, 0.65e-6, S1, S2, Qabs, Qsca, Qext, particlePhase);
-		*/
-
-		/*
 		double extinction = bulk_A.extinction + bulk_M.extinction;
 		double scattering = bulk_A.scattering + bulk_M.scattering;
 		double absorption = bulk_A.absorption + bulk_M.absorption;
-		double phase = ((bulk_A.phase * bulk_A.scattering) + (bulk_M.phase * bulk_M.scattering)) / scattering;
-		*/
+		double phase = (1.0 / scattering) * ((bulk_A.phase * bulk_A.scattering) + (bulk_M.phase * bulk_M.scattering));
 
-		mieOutput << bulk_A.scattering << "," << endl;
-		std::cout << bulk_A.scattering << endl;
+		mieOutput << absorption << "," << endl;
+		std::cout << absorption << endl;
 	}
+
+	//vec3(0.0160536, 0.0177289, 0.019914)
+	//vec3(1.2485e-04, 1.44216e-04, 1.71139e-04)
 
 	std::cout << "Finished generating Mie Phase" << endl;
 	mieOutput << ");" << endl;
