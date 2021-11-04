@@ -109,9 +109,9 @@ int main() {
 		counter1++;
 		double dtheta{ pi / angles };
 		double theta = n * dtheta;
-		//BulkMedium bulk_C;
+		BulkMedium bulk_C;
 		//BulkMedium bulk_M;
-		//ComputeBulkOpticalProperties(iorHost, theta, lambda, clouds, bulk_C);
+		ComputeBulkOpticalProperties(iorHost, theta, lambda, clouds, bulk_C);
 		//ComputeBulkOpticalProperties(iorHost, theta, lambda, mineral, bulk_M);
 
 		/*
@@ -123,14 +123,12 @@ int main() {
 		double phase;
 		ComputeParticleProperties(iorHost, clouds.ior, theta, 10e-6, lambda, S1, S2, Qabs, Qsca, Qext, phase);
 		*/
-		
-		/*
+	
 		double absorptionMedium = 4.0 * pi * imag(iorHost) / lambda;
 		double extinction = absorptionMedium + (bulk_C.extinction);
 		double scattering = bulk_C.scattering;
 		double absorption = bulk_C.absorption;
 		double phase = (1.0 / scattering) * bulk_C.phase * bulk_C.scattering;
-		*/
 
 		mieOutput << "	" << phase << ", " << endl;
 		std::cout << phase << endl;
