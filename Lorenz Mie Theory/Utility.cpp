@@ -82,7 +82,7 @@ glm::dvec3 xyzToRGB(glm::dvec3 xyz) {
 	return xyz * xyzToRGBMatrix;
 }
 
-glm::dvec3 spectrumToXYZ(glm::dvec3 spectrum, float w) {
+glm::dvec3 SpectrumToXYZ(glm::dvec3 spectrum, float w) {
 	float n = (w - 390.0);
 	int i = int(n);
 	if (i < 0 || i >= (830 - 390)) {

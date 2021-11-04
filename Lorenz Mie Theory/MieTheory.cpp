@@ -1,8 +1,6 @@
 #include "Utility.h"
 #include "MieTheory.h"
 
-#include "besselComplex.hpp"
-
 unsigned int M = 0u;
 valarray<complex<double>> particleA;
 valarray<complex<double>> hostA;
@@ -140,8 +138,6 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 		https://cseweb.ucsd.edu//~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf
 
 		Secontion 2: Scattering in Participating Media
-
-		Something is wrong with this function, and/or the functions it calls.
 	*/
 	double size = 2.0 * pi * radius / lambda;
 	M = TermsToSum(iorHost * size);
@@ -165,8 +161,8 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 		complex<double> b_n = b;
 
 		double tmp = (2.0 * n + 1.0) / (n * (n + 1.0));
-		S1 += tmp * (a_n * PiN + b_n * TauN);// / (iorHost * iorHost);
-		S2 += tmp * (a_n * TauN + b_n * PiN);// / (iorHost * iorHost);
+		S1 += tmp * (a_n * PiN + b_n * TauN);
+		S2 += tmp * (a_n * TauN + b_n * PiN);
 		sum += (2.0 * n + 1.0) * (sqr(abs(a_n)) + sqr(abs(b_n)));
 
 		crossSectionEXT += (2.0 * n + 1.0) * real((a_n + b_n) / (iorHost * iorHost));
