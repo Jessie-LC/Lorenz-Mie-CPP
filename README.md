@@ -7,4 +7,4 @@ References:
 
 [Predicting The Appearance Of Materials Using Lorenz-Mie Theory](http://people.compute.dtu.dk/jerf/papers/predicting.pdf)
 
-[Light Scattering By Small Particles](https://books.google.com/books?id=777DAgAAQBAJ)
+Light Scattering By Small Particles - Van De Hulst
