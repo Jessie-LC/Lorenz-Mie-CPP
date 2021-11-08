@@ -2,8 +2,8 @@
 Implementation of the Lorenz Mie theory in C++.
 
 References:
-http://cseweb.ucsd.edu/~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf
+[Computing the Scattering Properties of Participating Media Using Lorenz-Mie Theory](https://cseweb.ucsd.edu//~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf)
 
-http://people.compute.dtu.dk/jerf/papers/predicting.pdf
+[Predicting The Appearance Of Materials Using Lorenz-Mie Theory](http://people.compute.dtu.dk/jerf/papers/predicting.pdf)
 
-Light Scattering By Small Particles - Written By Van De Hulst
+[Light Scattering By Small Particles](https://books.google.com/books?id=777DAgAAQBAJ)
