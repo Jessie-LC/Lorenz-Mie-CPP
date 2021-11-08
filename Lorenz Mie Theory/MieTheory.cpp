@@ -57,7 +57,7 @@ complex<double> B(unsigned int n, const complex<double>& z, valarray<complex<dou
 	}
 
 	if (n == old_n + 1) {
-		oldB = A[n] + complex<double>(0.0, 1.0) / PsiZeta(n, z, oldB, A);
+		oldB = A[n] + (complex<double>(0.0, 1.0) / PsiZeta(n, z, oldB, A));
 		if (n == M) {
 			old_n = 0;
 		}
@@ -173,14 +173,14 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 	double alpha = 4.0 * pi * radius * imag(iorHost) / lambda;
 	double y = alpha < 10e-6 ? 1.0 : (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
 	double term1 = pow(lambda, 2.0) * exp(-alpha);
-	double term2 = 2.0 * pi * y * pow(abs(iorHost), 2.0);
+	double term2 = 2.0 * pi * y * sqr(abs(iorHost));
 
 	Qsca = term1 / term2 * sum;
-	Qext = (pow(lambda, 2.0) / tau) * crossSectionEXT;
+	Qext = (sqr(lambda) / tau) * crossSectionEXT;
 
 	Qabs = Qext - Qsca;
 
-	complex<double> k = 2.0 * pi * iorHost / lambda;
+	complex<double> k = (size / radius) * iorHost;
 
 	phase = (sqr(abs(S1)) + sqr(abs(S2))) / (2.0 * sqr(abs(k)) * Qsca);
 }

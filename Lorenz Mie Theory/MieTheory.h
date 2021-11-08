@@ -11,8 +11,8 @@
 using namespace std;
 
 struct LogNormalParticleDistribution {
-	double v;
-	double c;
+	double mean;
+	double standardDeviation;
 };
 
 struct ParticleDistribution {
