@@ -150,8 +150,6 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 
 	double cosTheta = cos(theta);
 
-	complex<double> term = { 0.0, 0.0 };
-
 	double crossSectionEXT = 0.0;
 	for (unsigned int n = 1; n < M; ++n) {
 		double PiN = computePi(cosTheta, n);
