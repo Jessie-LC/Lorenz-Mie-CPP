@@ -127,18 +127,18 @@ complex<double> SphJn(int n, complex<double> z) {
 	return j;
 }
 
+complex<double> Yn(double n, complex<double> z) {
+	//This is the Bessel function of the second kind.
+	return (Jn(n, z) * cos(n * pi) - Jn(-n, z)) / sin(n * pi);
+}
+
 complex<double> SphYn(int n, complex<double> z) {
 	//This is the Spherical Bessel function of the second kind.
 	//Something is incorrect with this code, but it is close enough that I do not care.
 	if (isnan(z.real()) || isnan(z.imag())) {
 		return z;
 	}
-	if (z.real() == 0.0 || z.imag() == 0.0) {
-		if (n == 0) {
-			return complex<double>(1.0, 1.0);
-		}
-	}
-	complex<double> y = pow(-1, n + 1) * sqrt(pi / (2.0 * z)) * Jn(-(double)n - 0.5, z);
+	complex<double> y = sqrt(pi / (2.0 * z)) * Yn((double)n + 0.5, z);
 	if (isnan(y.real()) || isnan(y.imag())) {
 		return z;
 	}

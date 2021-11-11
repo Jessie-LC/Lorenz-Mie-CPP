@@ -131,9 +131,8 @@ int main() {
 	for (int n = 0; n < angles; ++n) {
 		double dtheta{ pi / angles };
 		double theta = n * dtheta;
-	
-		double phase = 0.0;
 		/*
+		double phase = 0.0;
 		double scattering = 0.0;
 		double extinction = 0.0;
 		double absorption = 0.0;
@@ -158,11 +157,8 @@ int main() {
 
 		std::cout << ((double)n / (double)angles) * 180.0 << "  " << scattering << "  " << extinction << "  " << phase << endl;
 		*/
-
 		std::cout << SphYn(n, complex<double>(theta, 0.0)).real() << "	" << sph_neumann(n, theta) << endl;
 	}
-
-	std::cout << "Finished generating volume properties!" << endl;
 
 	/*
 	glm::vec3 phaseTexture[angles];
