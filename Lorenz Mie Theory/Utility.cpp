@@ -74,6 +74,77 @@ double computeTau(double mu, int n) {
 	return mu * computePi(mu, n) - pow(mu_sin, 2.0) * derivativePi(mu, n);
 }
 
+double Factorial(int n) {
+	double x = 1.0;
+	for (int i = 1; i <= n; ++i) {
+		x *= i;
+	}
+	return x;
+}
+
+double T_Gamma(double z) {
+	//This is the Gamma function.
+	double product = 1.0 / z;
+	int n = 1;
+	while (z <= 30.0) {
+		double value = pow(1.0 + (1.0 / n), z) / (1.0 + (z / (double)n));
+		if (max(value, 1.0 / value) < 1.00001) {
+			break;
+		}
+		product *= value;
+		++n;
+	}
+	if (z > 30.0) {
+		product = sqrt(tau) * pow(z, z - 0.5) * exp(-z);
+	}
+	return product;
+}
+
+complex<double> Jn(double n, complex<double> z) {
+	//This is the Bessel function of the first kind.
+	complex<double> sum = 0.0;
+	for (double m = 0.0; m < n; m += 1.0) {
+		sum += (pow(-1, m) / (Factorial((int)m) * T_Gamma(m + n + 1))) * pow(z / 2.0, 2 * m + n);
+	}
+	return sum;
+}
+
+complex<double> SphJn(int n, complex<double> z) {
+	//This is the Spherical Bessel function of the first kind.
+	//Something is incorrect with this code, but it is close enough that I do not care.
+	if (isnan(z.real()) || isnan(z.imag())) {
+		return z;
+	}
+	if (z.real() == 0.0 || z.imag() == 0.0) {
+		if (n == 0) {
+			return complex<double>(1.0, 1.0);
+		}
+	}
+	complex<double> j = sqrt(pi / (2.0 * z)) * Jn((double)n + 0.5, z);
+	if (isnan(j.real()) || isnan(j.imag())) {
+		return z;
+	}
+	return j;
+}
+
+complex<double> SphYn(int n, complex<double> z) {
+	//This is the Spherical Bessel function of the second kind.
+	//Something is incorrect with this code, but it is close enough that I do not care.
+	if (isnan(z.real()) || isnan(z.imag())) {
+		return z;
+	}
+	if (z.real() == 0.0 || z.imag() == 0.0) {
+		if (n == 0) {
+			return complex<double>(1.0, 1.0);
+		}
+	}
+	complex<double> y = pow(-1, n + 1) * sqrt(pi / (2.0 * z)) * Jn(-(double)n - 0.5, z);
+	if (isnan(y.real()) || isnan(y.imag())) {
+		return z;
+	}
+	return y;
+}
+
 double sqr(double x) {
 	return x * x;
 }

@@ -6,7 +6,7 @@
 
 using namespace std;
 
-const int angles = 1800;
+const int angles = 180;
 
 int main() {
 	complex<double> iorHost = complex<double>(1.335601, 2.46E-09);
@@ -25,7 +25,7 @@ int main() {
 	for (double r = rMin_mineral + mineral_stepSize * 0.5; r < rMax_mineral; r += mineral_stepSize) {
 		N_mineral[counter] = (3.07e-7 / 10.44) * pow(2.0 * r, -3.4);
 		//N_mineral[counter] *= 3.0 / (4.0 * pi * r * r * r) * 1.0 / mineral_stepSize;
-		std::cout << "Number Density Mineral: " << N_mineral[counter] << endl;
+		//std::cout << "Number Density Mineral: " << N_mineral[counter] << endl;
 		++counter;
 	}
 
@@ -35,7 +35,7 @@ int main() {
 	for (double r = rMin_algae + algae_stepSize * 0.5; r < rMax_algae; r += algae_stepSize) {
 		N_algae[counter] = (3.87e-7 / 4.97) * pow(2.0 * r, -3.6);
 		//N_algae[counter] *= 3.0 / (4.0 * pi * r * r * r) * 1.0 / algae_stepSize;
-		std::cout << "Number Density Algae: " << N_algae[counter] << endl;
+		//std::cout << "Number Density Algae: " << N_algae[counter] << endl;
 		++counter;
 	}
 
@@ -133,6 +133,7 @@ int main() {
 		double theta = n * dtheta;
 	
 		double phase = 0.0;
+		/*
 		double scattering = 0.0;
 		double extinction = 0.0;
 		double absorption = 0.0;
@@ -156,10 +157,14 @@ int main() {
 		mieData[n] = phase;
 
 		std::cout << ((double)n / (double)angles) * 180.0 << "  " << scattering << "  " << extinction << "  " << phase << endl;
+		*/
+
+		std::cout << SphYn(n, complex<double>(theta, 0.0)).real() << "	" << sph_neumann(n, theta) << endl;
 	}
 
 	std::cout << "Finished generating volume properties!" << endl;
 
+	/*
 	glm::vec3 phaseTexture[angles];
 	for (int x = 0; x < angles; ++x) {
 		phaseTexture[x] = glm::vec3(mieData[x]);
@@ -197,4 +202,5 @@ int main() {
 	std::cout << "Scattering Coefficient:	" << scatteringCoefficient / maxCDF.x << endl;
 	std::cout << "Extinction Coefficient:	" << extinctionCoefficient / maxCDF.x << endl;
 	std::cout << "Absorption Coefficient:	" << absorptionCoefficient / maxCDF.x << endl;
+	*/
 }
