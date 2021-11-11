@@ -103,8 +103,8 @@ double T_Gamma(double z) {
 complex<double> Jn(double n, complex<double> z) {
 	//This is the Bessel function of the first kind.
 	complex<double> sum = 0.0;
-	for (double m = 0.0; m < n; m += 1.0) {
-		sum += (pow(-1, m) / (Factorial((int)m) * T_Gamma(m + n + 1))) * pow(z / 2.0, 2 * m + n);
+	for (int m = 0; m < 500; ++m) {
+		sum += (pow(-1, m) / (Factorial(m) * T_Gamma(m + n + 1))) * pow(z / 2.0, 2 * m + n);
 	}
 	return sum;
 }
@@ -115,14 +115,9 @@ complex<double> SphJn(int n, complex<double> z) {
 	if (isnan(z.real()) || isnan(z.imag())) {
 		return z;
 	}
-	if (z.real() == 0.0 || z.imag() == 0.0) {
-		if (n == 0) {
-			return complex<double>(1.0, 1.0);
-		}
-	}
 	complex<double> j = sqrt(pi / (2.0 * z)) * Jn((double)n + 0.5, z);
 	if (isnan(j.real()) || isnan(j.imag())) {
-		return z;
+		return complex<double>(1.0, 0.0);
 	}
 	return j;
 }

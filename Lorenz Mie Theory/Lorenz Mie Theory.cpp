@@ -157,7 +157,7 @@ int main() {
 
 		std::cout << ((double)n / (double)angles) * 180.0 << "  " << scattering << "  " << extinction << "  " << phase << endl;
 		*/
-		std::cout << SphYn(n, complex<double>(theta, 0.0)).real() << "	" << sph_neumann(n, theta) << endl;
+		std::cout << SphJn(1, complex<double>(theta, 0.0)).real() << "  " << sph_bessel(1, theta) << endl;
 	}
 
 	/*
