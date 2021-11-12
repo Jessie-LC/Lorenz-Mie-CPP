@@ -101,6 +101,32 @@ complex<double> R(unsigned int n, const complex<double>& z, valarray<complex<dou
 	return oldR;
 }
 
+complex<double> SphJn_Derivative(int n, complex<double> z) {
+	return SphJn(n - 1, z) - ((double)(n + 1) / z) * SphJn(n, z);
+}
+
+complex<double> SphYn_Derivative(int n, complex<double> z) {
+	return SphYn(n - 1, z) - ((double)(n + 1) / z) * SphYn(n, z);
+}
+
+complex<double> Psi(int n, complex<double> z) {
+	return z * SphJn(n, z);
+}
+
+complex<double> PsiPrime(int n, complex<double> z) {
+	return 1.0 * SphJn(n, z) + z * SphJn_Derivative(n, z);
+}
+
+complex<double> Zeta(int n, complex<double> z) {
+	return z * (SphJn(n, z) - complex<double>(0.0, 1.0) * SphYn(n, z));
+}
+
+complex<double> ZetaPrime(int n, complex<double> z) {
+	complex<double> g = SphJn(n, z) - complex<double>(0.0, 1.0) * SphYn(n, z);
+	complex<double> gPrime = SphJn_Derivative(n, z) - (complex<double>(0.0, 1.0) * SphYn_Derivative(n, z));
+	return 1.0 * g + z * gPrime;
+}
+
 void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, const complex<double>& iorParticle) {
 	static unsigned int old_n = 0;
 
@@ -121,11 +147,19 @@ void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, c
 	complex<double> hostZ = iorHost * size;
 	complex<double> particleZ = iorParticle * size;
 
+	/*
+	a = (iorHost * PsiPrime(n, particleZ) * Psi(n, hostZ) - iorParticle * Psi(n, particleZ) * PsiPrime(n, hostZ)) / 
+		(iorHost * PsiPrime(n, particleZ) * Zeta(n, hostZ) - iorParticle * Psi(n, particleZ) * ZetaPrime(n, hostZ));
+	b = (iorParticle * PsiPrime(n, particleZ) * Psi(n, hostZ) - iorHost * Psi(n, particleZ) * PsiPrime(n, hostZ)) /
+		(iorParticle * PsiPrime(n, particleZ) * Zeta(n, hostZ) - iorHost * Psi(n, particleZ) * ZetaPrime(n, hostZ));
+	*/
+
 	complex<double> B_n = B(n, hostZ, hostA);
 	complex<double> R_n = R(n, hostZ, hostA);
 
 	a = R_n * (iorHost * particleA[n] - iorParticle * hostA[n]) / (iorHost * particleA[n] - iorParticle * B_n);
 	b = R_n * (iorParticle * particleA[n] - iorHost * hostA[n]) / (iorParticle * particleA[n] - iorHost * B_n);
+
 }
 
 unsigned int TermsToSum(const complex<double> z) {

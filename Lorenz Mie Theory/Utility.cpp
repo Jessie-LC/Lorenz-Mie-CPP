@@ -74,6 +74,7 @@ double computeTau(double mu, int n) {
 	return mu * computePi(mu, n) - pow(mu_sin, 2.0) * derivativePi(mu, n);
 }
 
+//Everything past here can be optimized most likely.
 double Factorial(int n) {
 	double x = 1.0;
 	for (int i = 1; i <= n; ++i) {
@@ -86,16 +87,13 @@ double T_Gamma(double z) {
 	//This is the Gamma function.
 	double product = 1.0 / z;
 	int n = 1;
-	while (z <= 30.0) {
+	while (true) {
 		double value = pow(1.0 + (1.0 / n), z) / (1.0 + (z / (double)n));
-		if (max(value, 1.0 / value) < 1.00001) {
+		if (max(abs(value), 1.0 / abs(value)) < 1.00000001) {
 			break;
 		}
 		product *= value;
 		++n;
-	}
-	if (z > 30.0) {
-		product = sqrt(tau) * pow(z, z - 0.5) * exp(-z);
 	}
 	return product;
 }
@@ -103,8 +101,8 @@ double T_Gamma(double z) {
 complex<double> Jn(double n, complex<double> z) {
 	//This is the Bessel function of the first kind.
 	complex<double> sum = 0.0;
-	for (int m = 0; m < 500; ++m) {
-		sum += (pow(-1, m) / (Factorial(m) * T_Gamma(m + n + 1))) * pow(z / 2.0, 2 * m + n);
+	for (int m = 0; m < 50; ++m) {
+		sum += (pow(-1, m) / (Factorial(m) * tgamma(m + n + 1))) * pow(z / 2.0, 2 * m + n);
 	}
 	return sum;
 }
@@ -117,7 +115,7 @@ complex<double> SphJn(int n, complex<double> z) {
 	}
 	complex<double> j = sqrt(pi / (2.0 * z)) * Jn((double)n + 0.5, z);
 	if (isnan(j.real()) || isnan(j.imag())) {
-		return complex<double>(1.0, 0.0);
+		return z;
 	}
 	return j;
 }
