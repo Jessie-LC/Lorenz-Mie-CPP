@@ -11,7 +11,10 @@ using namespace std;
 const int angles = 1800;
 
 int main() {
-	complex<double> iorHost = complex<double>{ 1.335601, 2.46E-09 };
+	ofstream mieOutput;
+	mieOutput.open("Mie Outputs.txt");
+
+	complex<double> iorHost = complex<double>{ 1.3330, 1.9600e-9 };
 
 	double rMax_mineral = 100e-6;
 	double rMin_mineral = 0.1e-6;
@@ -21,27 +24,35 @@ int main() {
 	double rMin_algae = 0.225e-6;
 	double algae_stepSize = 2e-7;
 
+	mieOutput << "Mineral N" << endl;
+
 	int counter = 0;
 	valarray<double> N_mineral;
 	N_mineral.resize(static_cast<unsigned int>((rMax_mineral - rMin_mineral) / mineral_stepSize) + 1u);
 	for (double r = rMin_mineral + mineral_stepSize * 0.5; r < rMax_mineral; r += mineral_stepSize) {
-		N_mineral[counter] = (3.07e-7 / 10.44) * pow(2.0 * r, -3.4);
-		N_mineral[counter] *= pow(r, 3.0);
-		//N_mineral[counter] *= 3.0 / (4.0 * pi * r * r * r) * 1.0 / mineral_stepSize;
-		std::cout << "Number Density Mineral: " << N_mineral[counter] << endl;
+		N_mineral[counter] = (5.429e-7 / 10.44) * pow(2.0 * r, -3.4);
+		mieOutput << N_mineral[counter] << endl;
+		//std::cout << "Number Density Mineral: " << N_mineral[counter] << endl;
 		++counter;
 	}
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
 
+	mieOutput << "Algae N" << endl;
 	counter = 0;
 	valarray<double> N_algae;
 	N_algae.resize(static_cast<unsigned int>((rMax_algae - rMin_algae) / algae_stepSize) + 1u);
 	for (double r = rMin_algae + algae_stepSize * 0.5; r < rMax_algae; r += algae_stepSize) {
-		N_algae[counter] = (3.87e-7 / 4.97) * pow(2.0 * r, -3.6);
-		//N_algae[counter] *= 3.0 / (4.0 * pi * r * r * r) * 1.0 / algae_stepSize;
-		N_algae[counter] *= pow(r, 3.0);
-		std::cout << "Number Density Algae: " << N_algae[counter] << endl;
+		N_algae[counter] = (1.904e-6 / 4.97) * pow(2.0 * r, -3.6);
+		mieOutput << N_algae[counter] << endl;
 		++counter;
 	}
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
 
 	ParticleDistribution mineral{
 		complex<double>{ 1.58, 3.61e-4 },
@@ -69,13 +80,13 @@ int main() {
 		}
 	};
 
-	double rMax_water = 1.0e-6;
-	double rMin_water = 0.1e-6; //If problems occur, make this smaller.
-	double water_stepSize = 0.018e-6;
+	double rMax_water = 20.0e-6;
+	double rMin_water = 0.1e-6;
+	double water_stepSize = 0.1e-6;
 
 	LogNormalParticleDistribution CloudLogNormal{
-		0.5e-6,
-		CloudLogNormal.mean * 0.20
+		4.0e-6,
+		CloudLogNormal.mean * 0.25
 	};
 
 	valarray<double> N_cloud;
@@ -86,6 +97,8 @@ int main() {
 	double a = 4.0e4;
 	double beta = sqrt(beta_sqr);
 
+	double volume = 0.0;
+
 	counter = 0;
 	N_cloud.resize(static_cast<unsigned int>((rMax_water - rMin_water) / water_stepSize) + 1u);
 	for (double r = rMin_water + water_stepSize * 0.5; r < rMax_water; r += water_stepSize) {
@@ -93,16 +106,15 @@ int main() {
 		double tmp = (log(x) - alpha) / beta;
 		double y = 1.0;
 		N_cloud[counter] = 1.0 / (x * beta * sqrt(tau)) * exp(-0.5 * tmp * tmp);
-		//N_cloud[counter] = a * pow(x, alpha) * exp(-beta * pow(x, y));
-		//std::cout << N_cloud[counter] << "," << endl;
+		volume += N_cloud[counter];
 		++counter;
 	}
+	//Dunno if these are right for clouds. ((cloud weight / cloud density) / (air weight / air density)) / volume fraction
+	N_cloud *= ((500000.0 / 0.001003) / (1293.0 / 0.001225)) / volume;
 
 	counter = 0;
 	for (double r = rMin_water + water_stepSize * 0.5; r < rMax_water; r += water_stepSize) {
-		//Pretty sure one of these is needed, just not sure which.
-		//N_cloud[counter] *= 3.0 / (4.0 * pi * r * r * r) * 1.0 / water_stepSize;
-		N_cloud[counter] *= r * r * r;
+		N_cloud[counter] *= 3.0 / (4.0 * pi * r * r * r) / water_stepSize; //This is correct.
 		++counter;
 	}
 
@@ -122,12 +134,17 @@ int main() {
 	Particles[0] = algae;
 	Particles[1] = mineral;
 
-	double lambda = 0.650e-6;
+	double lambda = 0.550e-6;
 	
 	valarray<double> mieData;
 	mieData.resize(angles);
 
 	double absorptionMedium = 4.0 * pi * imag(iorHost) / lambda;
+
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
 
 	double scatteringAlbedo = 0.0;
 	double scatteringCoefficient = 0.0;
@@ -136,7 +153,7 @@ int main() {
 	std::cout << "Start generating volume properties via Mie Theory" << endl;
 	std::cout << "Angle" << "  " << "Scattering" << "  " << "Extinction" << "  " << "Bulk Phase" << endl;
 	for (int n = 0; n < angles; ++n) {
-		double dtheta{ pi / angles };
+		double dtheta{ pi / (angles - 1) };
 		double theta = n * dtheta;
 
 		double phase = 0.0;
@@ -155,12 +172,15 @@ int main() {
 		scatteringCoefficient = scattering;
 		extinctionCoefficient = extinction;
 		absorptionCoefficient = extinction - scattering;
-		scatteringAlbedo = glm::clamp(scattering / extinction, 0.0, 10.0);
+		scatteringAlbedo = glm::clamp(abs(scattering / extinction), 0.0, 10.0);
 
 		mieData[n] = phase;
 
-		std::cout << ((double)n / (double)angles) * 180.0 << "  " << scattering << "  " << extinction << "  " << phase << endl;
+		std::cout << ((double)n / (double)(angles - 1)) * 180.0 << "  " << scattering << "  " << extinction << "  " << phase << endl;
 	}
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
 
 	glm::vec3 phaseTexture[angles];
 	for (int x = 0; x < angles; ++x) {
@@ -171,7 +191,7 @@ int main() {
 	for (int n = 0; n < angles; ++n) {
 		float integral = 0.0;
 		for (int m = 0; m < n; ++m) {
-			float dTheta = pi / angles;
+			float dTheta = pi / (angles - 1);
 			integral += (mieData[m] * sin(m * dTheta)) * dTheta;
 		}
 		CDF[n] = glm::vec3(integral) / (float)(pi / 2.0);
@@ -179,11 +199,17 @@ int main() {
 
 	glm::vec3 maxCDF = CDF[angles - 1];
 
+	mieOutput << "Phase" << endl;
 	for (int n = 0; n < angles; ++n) {
 		phaseTexture[n] /= maxCDF;
 		CDF[n] /= maxCDF;
+		mieOutput << phaseTexture[n].x << endl;
 		std::cout << "CDF:	" << CDF[n].x << "	Phase:	" << phaseTexture[n].x << endl;
 	}
+
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
+	mieOutput << " " << endl;
 
 	ofstream phaseLut("phase.dat", ios::binary);
 	phaseLut.write(reinterpret_cast<char*>(phaseTexture), sizeof(glm::vec3) * angles * 1);
@@ -199,4 +225,9 @@ int main() {
 	std::cout << "Scattering Coefficient:	" << scatteringCoefficient / maxCDF.x << endl;
 	std::cout << "Extinction Coefficient:	" << extinctionCoefficient / maxCDF.x << endl;
 	std::cout << "Absorption Coefficient:	" << absorptionCoefficient / maxCDF.x << endl;
+
+	mieOutput << "Coefficients" << endl;
+	mieOutput << scatteringCoefficient / maxCDF.x << endl;
+	mieOutput << extinctionCoefficient / maxCDF.x << endl;
+	mieOutput << absorptionCoefficient / maxCDF.x << endl;
 }

@@ -159,7 +159,6 @@ void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, c
 
 	a = R_n * (iorHost * particleA[n] - iorParticle * hostA[n]) / (iorHost * particleA[n] - iorParticle * B_n);
 	b = R_n * (iorParticle * particleA[n] - iorHost * hostA[n]) / (iorParticle * particleA[n] - iorHost * B_n);
-
 }
 
 unsigned int TermsToSum(const complex<double> z) {
@@ -212,7 +211,7 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 
 	Qabs = Qext - Qsca;
 
-	complex<double> k = (size / radius) * iorHost;
+	complex<double> k = 2.0 * pi * iorHost / lambda;
 
 	phase = (sqr(abs(S1)) + sqr(abs(S2))) / (2.0 * sqr(abs(k)) * Qsca);
 }
