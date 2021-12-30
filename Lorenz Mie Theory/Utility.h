@@ -7,6 +7,7 @@
 #include <thread>
 #include <complex>
 #include <valarray>
+#include <chrono>
 #include "glm.hpp"
 #include "constants.h"
 
@@ -25,6 +26,7 @@ double derivativePi(double x, int n);
 
 double computeTau(double mu, int n);
 
+double Factorial(int n);
 double T_Gamma(double z);
 std::complex<double> SphJn(int n, std::complex<double> z);
 std::complex<double> SphYn(int n, std::complex<double> z);

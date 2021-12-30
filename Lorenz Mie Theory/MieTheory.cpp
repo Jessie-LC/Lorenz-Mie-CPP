@@ -152,26 +152,23 @@ void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, c
 		(iorHost * PsiPrime(n, particleZ) * Zeta(n, hostZ) - iorParticle * Psi(n, particleZ) * ZetaPrime(n, hostZ));
 	b = (iorParticle * PsiPrime(n, particleZ) * Psi(n, hostZ) - iorHost * Psi(n, particleZ) * PsiPrime(n, hostZ)) /
 		(iorParticle * PsiPrime(n, particleZ) * Zeta(n, hostZ) - iorHost * Psi(n, particleZ) * ZetaPrime(n, hostZ));
-	*/
+	//*/
 
+	//*
 	complex<double> B_n = B(n, hostZ, hostA);
 	complex<double> R_n = R(n, hostZ, hostA);
 
 	a = R_n * (iorHost * particleA[n] - iorParticle * hostA[n]) / (iorHost * particleA[n] - iorParticle * B_n);
 	b = R_n * (iorParticle * particleA[n] - iorHost * hostA[n]) / (iorParticle * particleA[n] - iorHost * B_n);
+	//*/
 }
 
 unsigned int TermsToSum(const complex<double> z) {
 	double size = abs(z);
-	return static_cast<unsigned int>(ceil(size + 4.3 * cbrt(size) + 1.0));
+	return static_cast<unsigned int>(ceil(size + 215.0 * cbrt(size) + 1.0));
 }
 
-void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Qabs, double& Qsca, double& Qext, double& phase) {
-	/*
-		https://cseweb.ucsd.edu//~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf
-
-		Secontion 2: Scattering in Participating Media
-	*/
+void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Cabs, double& Csca, double& Cext, double& phase) {
 	double size = 2.0 * pi * radius / lambda;
 	M = TermsToSum(iorHost * size);
 	AallN(hostA, iorHost * size);
@@ -206,14 +203,14 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 	double term1 = pow(lambda, 2.0) * exp(-alpha);
 	double term2 = 2.0 * pi * y * sqr(abs(iorHost));
 
-	Qsca = term1 / term2 * sum;
-	Qext = (sqr(lambda) / tau) * crossSectionEXT;
-
-	Qabs = Qext - Qsca;
-
 	complex<double> k = 2.0 * pi * iorHost / lambda;
 
-	phase = (sqr(abs(S1)) + sqr(abs(S2))) / (2.0 * sqr(abs(k)) * Qsca);
+	Csca = term1 / term2 * sum;
+	Cext = (sqr(lambda) / tau) * crossSectionEXT;
+
+	Cabs = Cext - Csca;
+
+	phase = (sqr(abs(S1)) + sqr(abs(S2))) / (2.0 * sqr(abs(k)) * Csca);
 }
 
 void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle, BulkMedium& bulk) {
@@ -229,17 +226,17 @@ void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double 
 	for (double r = particle.rMin + particle.stepSize * 0.5; r < particle.rMax; r += particle.stepSize) {
 		complex<double> S1;
 		complex<double> S2;
-		double Qsca;
-		double Qabs;
-		double Qext;
+		double Csca;
+		double Cabs;
+		double Cext;
 		double particlePhase;
-		ComputeParticleProperties(iorHost, particle.ior, theta, r, lambda, S1, S2, Qabs, Qsca, Qext, particlePhase);
+		ComputeParticleProperties(iorHost, particle.ior, theta, r, lambda, S1, S2, Cabs, Csca, Cext, particlePhase);
 
-		double sigmaS = Qsca * particle.N[counter] * particle.stepSize;
+		double sigmaS = Csca * particle.N[counter] * particle.stepSize;
 
 		scatteringSigma += sigmaS;
-		extinctionSigma += Qext * particle.N[counter] * particle.stepSize;
-		phase += Qsca * particlePhase * particle.N[counter] * particle.stepSize;
+		extinctionSigma += Cext * particle.N[counter] * particle.stepSize;
+		phase += Csca * particlePhase * particle.N[counter] * particle.stepSize;
 
 		++counter;
 	}

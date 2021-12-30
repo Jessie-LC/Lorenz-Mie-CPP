@@ -4,21 +4,20 @@
 #include <tuple>
 #include <limits>
 
-#include "bessel.h"
-
 using namespace std;
 
-const int angles = 1800;
+const int angles = 3060;
+const int wavelengths = 441;
 
 int main() {
 	ofstream mieOutput;
 	mieOutput.open("Mie Outputs.txt");
 
-	complex<double> iorHost = complex<double>{ 1.3330, 1.9600e-9 };
+	complex<double> iorHost = complex<double>{ 1.00028, 0.0 };
 
 	double rMax_mineral = 100e-6;
-	double rMin_mineral = 0.1e-6;
-	double mineral_stepSize = 1e-7;
+	double rMin_mineral = 0.05e-6;
+	double mineral_stepSize = rMin_mineral;
 
 	double rMax_algae = 100e-6;
 	double rMin_algae = 0.225e-6;
@@ -47,6 +46,7 @@ int main() {
 	for (double r = rMin_algae + algae_stepSize * 0.5; r < rMax_algae; r += algae_stepSize) {
 		N_algae[counter] = (1.904e-6 / 4.97) * pow(2.0 * r, -3.6);
 		mieOutput << N_algae[counter] << endl;
+		//std::cout << "Number Density Algae: " << N_algae[counter] << endl;
 		++counter;
 	}
 	mieOutput << " " << endl;
@@ -80,21 +80,20 @@ int main() {
 		}
 	};
 
-	double rMax_water = 20.0e-6;
-	double rMin_water = 0.1e-6;
-	double water_stepSize = 0.1e-6;
+	double rMax_water = 2.0e-5;
+	double rMin_water = 1.0e-7;
+	double water_stepSize = rMin_water;
 
 	LogNormalParticleDistribution CloudLogNormal{
 		4.0e-6,
-		CloudLogNormal.mean * 0.25
+		CloudLogNormal.mean * 0.20
 	};
 
 	valarray<double> N_cloud;
 
-	double x_vs = CloudLogNormal.mean;
-	double beta_sqr = log(((CloudLogNormal.standardDeviation * CloudLogNormal.standardDeviation) / (x_vs * x_vs)) + 1.0);
-	double alpha = log(x_vs) - 0.5 * beta_sqr;
-	double a = 4.0e4;
+	double beta_sqr = log(((CloudLogNormal.standardDeviation * CloudLogNormal.standardDeviation) / (CloudLogNormal.mean * CloudLogNormal.mean)) + 1.0);
+	double alpha = log(CloudLogNormal.mean) - 0.5 * beta_sqr;
+	double a = 4.9757e6;
 	double beta = sqrt(beta_sqr);
 
 	double volume = 0.0;
@@ -102,26 +101,34 @@ int main() {
 	counter = 0;
 	N_cloud.resize(static_cast<unsigned int>((rMax_water - rMin_water) / water_stepSize) + 1u);
 	for (double r = rMin_water + water_stepSize * 0.5; r < rMax_water; r += water_stepSize) {
-		double x = r;
+		double x = r * 1e6;
 		double tmp = (log(x) - alpha) / beta;
-		double y = 1.0;
-		N_cloud[counter] = 1.0 / (x * beta * sqrt(tau)) * exp(-0.5 * tmp * tmp);
-		volume += N_cloud[counter];
+		double y = 0.5;
+		double cumulus = 2.373 * pow(x, 6.0) * exp(-1.5 * x);
+		double normal = (1.0 / (CloudLogNormal.standardDeviation * sqrt(tau))) * exp(-0.5 * pow((r - CloudLogNormal.mean) / CloudLogNormal.standardDeviation, 2.0));
+		double logNormal = (1.0 / (r * beta * sqrt(tau))) * exp(-0.5 * pow((log(r) - alpha) / beta, 2.0));
+		double haze = 5.33e4 * pow(x, 4.0) * exp(-8.9 * pow(x, 0.5));
+		N_cloud[counter] = cumulus;
+		volume += pow(r, 3.0) * N_cloud[counter] * water_stepSize;
 		++counter;
 	}
-	//Dunno if these are right for clouds. ((cloud weight / cloud density) / (air weight / air density)) / volume fraction
-	N_cloud *= ((500000.0 / 0.001003) / (1293.0 / 0.001225)) / volume;
+
+	double waterWeight = 0.5;
+	double waterDensity = 1000.0;
+	double waterVolume = waterWeight < 1e-12 ? 0.0 : waterWeight / waterDensity;
+	double airVolume = 1.0 - waterVolume;
+
+	double N = ((waterWeight > 1e-12 ? waterVolume : 1.0) / airVolume) / (4.1887902 * volume);
 
 	counter = 0;
 	for (double r = rMin_water + water_stepSize * 0.5; r < rMax_water; r += water_stepSize) {
-		N_cloud[counter] *= 3.0 / (4.0 * pi * r * r * r) / water_stepSize; //This is correct.
+		N_cloud[counter] = N * N_cloud[counter];
+		std::cout << "Radius: " << r << " DSD: " << N_cloud[counter] << endl;
 		++counter;
 	}
 
-	std::cout << "Number Distribution finished generating" << endl;
-
 	ParticleDistribution clouds{
-		complex<double>{ 1.335601, 2.46E-09 },
+		complex<double>{ 1.3330, 1.9600e-9 },
 		rMin_water,
 		rMax_water,
 		water_stepSize,
@@ -131,13 +138,12 @@ int main() {
 	};
 
 	ParticleDistribution Particles[2];
-	Particles[0] = algae;
+	Particles[0] = clouds;
 	Particles[1] = mineral;
 
 	double lambda = 0.550e-6;
 	
-	valarray<double> mieData;
-	mieData.resize(angles);
+	glm::vec3 mieData[angles];
 
 	double absorptionMedium = 4.0 * pi * imag(iorHost) / lambda;
 
@@ -150,51 +156,89 @@ int main() {
 	double scatteringCoefficient = 0.0;
 	double extinctionCoefficient = 0.0;
 	double absorptionCoefficient = 0.0;
-	std::cout << "Start generating volume properties via Mie Theory" << endl;
-	std::cout << "Angle" << "  " << "Scattering" << "  " << "Extinction" << "  " << "Bulk Phase" << endl;
+	valarray<double> anglesRadians;
+	anglesRadians.resize(angles);
+
+	auto t0 = std::chrono::high_resolution_clock::now();
 	for (int n = 0; n < angles; ++n) {
 		double dtheta{ pi / (angles - 1) };
 		double theta = n * dtheta;
 
+		anglesRadians[n] = theta;
+
+		//*
 		double phase = 0.0;
 		double scattering = 0.0;
 		double extinction = 0.0;
 		double absorption = 0.0;
-		for (int i = 0; i < 2; ++i) {
+		for (int i = 0; i < 1; ++i) {
 			BulkMedium Bulk;
 			ComputeBulkOpticalProperties(iorHost, theta, lambda, Particles[i], Bulk);
 			extinction += absorptionMedium + (Bulk.extinction);
 			scattering += Bulk.scattering;
 			phase += Bulk.phase * Bulk.scattering;
 		}
-		phase = (1.0 / scattering) * phase;
+		phase *= 1.0 / scattering;
 
 		scatteringCoefficient = scattering;
 		extinctionCoefficient = extinction;
 		absorptionCoefficient = extinction - scattering;
-		scatteringAlbedo = glm::clamp(abs(scattering / extinction), 0.0, 10.0);
+		scatteringAlbedo = glm::clamp(abs(scatteringCoefficient / extinctionCoefficient), 0.0, 10.0);
+		//*/
 
-		mieData[n] = phase;
+		/*
+		complex<double> S1;
+		complex<double> S2;
+		double Qsca;
+		double Qabs;
+		double Qext;
+		double phase;
+		ComputeParticleProperties(iorHost, complex<double>(1.33257, 1.67e-8), theta, 5.0e-8, 6.50e-7, S1, S2, Qabs, Qsca, Qext, phase);
 
-		std::cout << ((double)n / (double)(angles - 1)) * 180.0 << "  " << scattering << "  " << extinction << "  " << phase << endl;
+		scatteringCoefficient = Qsca;
+		extinctionCoefficient = Qext;
+		absorptionCoefficient = Qabs;
+		scatteringAlbedo = glm::clamp(abs(scatteringCoefficient / extinctionCoefficient), 0.0, 10.0);
+		//*/
+
+		mieData[n] = glm::vec3(phase);
+
+		cout << phase << endl;
+
+		//fprintf(stderr, "\b\b\b\b\%3d%c", (100 * n / angles), '%');
+
+		//cout << SphYn(100, complex<double>(theta, theta * 0.1)) << ", " << sph_neumann(100, theta) << ", " << abs(SphYn(100, complex<double>(theta, theta * 0.1)).real() - sph_neumann(100, theta)) << endl;
+
+		//cout << Factorial(n) << ", " << tgamma(n + 1) << ", " << n << endl;
+
+		//cout << TermsToSum(iorHost * (tau * rMax_water / lambda)) << endl;
 	}
+	cout << " " << endl;
 	mieOutput << " " << endl;
 	mieOutput << " " << endl;
 	mieOutput << " " << endl;
 
+	//*
 	glm::vec3 phaseTexture[angles];
 	for (int x = 0; x < angles; ++x) {
-		phaseTexture[x] = glm::vec3(mieData[x]);
+		phaseTexture[x] = mieData[x];
 	}
 
 	glm::vec3 CDF[angles];
-	for (int n = 0; n < angles; ++n) {
-		float integral = 0.0;
-		for (int m = 0; m < n; ++m) {
-			float dTheta = pi / (angles - 1);
-			integral += (mieData[m] * sin(m * dTheta)) * dTheta;
-		}
-		CDF[n] = glm::vec3(integral) / (float)(pi / 2.0);
+	CDF[0] = glm::vec3(0.0);
+	for (int n = 1; n < angles; ++n) {
+		float angleStart = anglesRadians[n - 1];
+		float angleEnd   = anglesRadians[n];
+		glm::vec3 phaseStart = mieData[n - 1];
+		glm::vec3 phaseEnd   = mieData[n];
+
+		glm::vec3 p1 = phaseStart * (cos(angleStart) - cos(angleEnd));
+		glm::vec3 p2 = (phaseEnd - phaseStart) / (angleEnd - angleStart);
+		float p3 = (sin(angleEnd) - angleEnd * cos(angleEnd)) - (sin(angleStart) - angleStart * cos(angleStart));
+		float p4 = angleStart * (cos(angleStart) - cos(angleEnd));
+
+		glm::vec3 integral = (float)2.0 * (float)pi * (p1 + p2 * (p3 - p4));
+		CDF[n] = CDF[n - 1] + integral;
 	}
 
 	glm::vec3 maxCDF = CDF[angles - 1];
@@ -206,6 +250,8 @@ int main() {
 		mieOutput << phaseTexture[n].x << endl;
 		std::cout << "CDF:	" << CDF[n].x << "	Phase:	" << phaseTexture[n].x << endl;
 	}
+
+	std::cout << maxCDF.x << endl;
 
 	mieOutput << " " << endl;
 	mieOutput << " " << endl;
@@ -230,4 +276,5 @@ int main() {
 	mieOutput << scatteringCoefficient / maxCDF.x << endl;
 	mieOutput << extinctionCoefficient / maxCDF.x << endl;
 	mieOutput << absorptionCoefficient / maxCDF.x << endl;
+	//*/
 }

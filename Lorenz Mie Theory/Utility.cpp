@@ -89,7 +89,7 @@ double T_Gamma(double z) {
 	int n = 1;
 	while (true) {
 		double value = pow(1.0 + (1.0 / n), z) / (1.0 + (z / (double)n));
-		if (max(abs(value), 1.0 / abs(value)) < 1.00000001) {
+		if (max(abs(value), 1.0 / abs(value)) < 1.000000001) {
 			break;
 		}
 		product *= value;
@@ -101,21 +101,33 @@ double T_Gamma(double z) {
 complex<double> Jn(double n, complex<double> z) {
 	//This is the Bessel function of the first kind.
 	complex<double> sum = 0.0;
-	for (int m = 0; m < 50; ++m) {
-		sum += (pow(-1, m) / (Factorial(m) * tgamma(m + n + 1))) * pow(z / 2.0, 2 * m + n);
+	for (int m = 0; m < 20; ++m) {
+		//Apparently the gamma function is equal to the factorial if you do "n + 1" as the input.
+		sum += (((m & 1) ? -1.0 : 1.0) * pow(z / 2.0, 2 * m + n)) / (tgamma(m + 1) * tgamma(m + n + 1));
 	}
 	return sum;
 }
 
 complex<double> SphJn(int n, complex<double> z) {
 	//This is the Spherical Bessel function of the first kind.
-	//Something is incorrect with this code, but it is close enough that I do not care.
 	if (isnan(z.real()) || isnan(z.imag())) {
 		return z;
 	}
+	if (isinf(z.real()) || -isinf(z.imag())) {
+		return complex<double>(0.0, 0.0);
+	}
+	if (z.real() == 0.0 && z.imag() == 0.0) {
+		if (n == 0) {
+			return complex<double>(1.0, 0.0);
+		}
+		else {
+			return complex<double>(0.0, 0.0);
+		}
+	}
 	complex<double> j = sqrt(pi / (2.0 * z)) * Jn((double)n + 0.5, z);
 	if (isnan(j.real()) || isnan(j.imag())) {
-		return z;
+		//If the bessel function produces a NaN, return 1.0+0.0i.
+		return complex<double>(1.0, 0.0);
 	}
 	return j;
 }
@@ -127,13 +139,23 @@ complex<double> Yn(double n, complex<double> z) {
 
 complex<double> SphYn(int n, complex<double> z) {
 	//This is the Spherical Bessel function of the second kind.
-	//Something is incorrect with this code, but it is close enough that I do not care.
 	if (isnan(z.real()) || isnan(z.imag())) {
 		return z;
 	}
+	if (isinf(z.real()) || -isinf(z.imag())) {
+		return complex<double>(0.0, 0.0);
+	}
+	if (z.real() == 0.0 && z.imag() == 0.0) {
+		if (n == 0) {
+			return complex<double>(1.0, 0.0);
+		}
+		else {
+			return complex<double>(0.0, 0.0);
+		}
+	}
 	complex<double> y = sqrt(pi / (2.0 * z)) * Yn((double)n + 0.5, z);
-	if (isnan(y.real()) || isnan(y.imag())) {
-		return z;
+	if (isnan(y.real()) || isnan(y.real())) {
+		return complex<double>(1.0, 0.0);
 	}
 	return y;
 }
