@@ -6,8 +6,73 @@
 
 using namespace std;
 
-const int angles = 3060;
+const int angles = 3600;
 const int wavelengths = 441;
+
+template <typename T> int sgn(T val) {
+	return (T(0) < val) - (val < T(0));
+}
+
+double HenyeyGreensteinPhase(double cosTheta, double g) {
+	const double norm = 0.25 / pi;
+
+	double gg = g * g;
+	return norm * ((1.0 - gg) / pow(1.0 + gg - 2.0 * g * cosTheta, 3.0 / 2.0));
+}
+
+double HenyeyGreensteinLegendre(double cosTheta, double g) {
+	double gg = g * g;
+	double P = 0.0;
+	for (int i = 0; i < 500; ++i) {
+		P += sgn((2.0 * i + 1.0) * pow(g, i)) * Pn(cosTheta, i);
+	}
+	return P / 12.5663706;
+}
+
+double CornetteShanks(double cosTheta, double g) {
+	double gg = g * g;
+	double p1 = 1.5 * ((1.0 - gg) / (2.0 + gg));
+	double p2 = (1.0 + sqr(cosTheta)) / (pow((1.0 + gg - 2.0 * g * cosTheta), 3.0 / 2.0));
+	double phase = (p1 * p2);
+	phase /= 12.5663706;
+	return phase;
+}
+
+double CornetteShanksLegendre(double cosTheta, double g) {
+	double gg = g * g;
+	double P = 0.0;
+	for (int i = 0; i < 500; ++i) {
+		double tmp1 = i * (i - 1) / (2.0 * i - 1.0);
+		double tmp2 = (((5.0 * sqr((double)i) - 1.0) / (2.0 * i - 1.0)) + (sqr(i + 1.0) / (2.0 * i + 3.0))) * pow(g, i);
+		double tmp3 = (((i + 1.0) * (i + 2.0)) / (2.0 * i + 3.0)) * pow(g, i + 2.0);
+		P += sgn(tmp1 + tmp2 + tmp3) * Pn(cosTheta, i);
+	}
+	return 1.5 * (1.0 / (2.0 + gg)) * P;
+}
+
+/*
+
+float LambdaSample() {
+	float r = RandNextF(), g;
+	int i;
+	for (i = 0; i < 441 && r >= 0.0; i++) {
+		g = dot(cie[i], 1.0 / vec3(113.042)) / 3.0;
+		r -= g * 1.0;
+	}
+
+	return float(390 + i) + r / g;
+}
+
+float LambdaPdf(float w) {
+	float n = (w - 390.0);
+	int i = int(n);
+	if(i < 0 || i >= (830-390)) {
+		return 0.0;
+	}
+	return (dot(cie[i], 1.0 / vec3(113.042)) * 441.0);
+}
+
+*/
 
 int main() {
 	ofstream mieOutput;
@@ -31,7 +96,6 @@ int main() {
 	for (double r = rMin_mineral + mineral_stepSize * 0.5; r < rMax_mineral; r += mineral_stepSize) {
 		N_mineral[counter] = (5.429e-7 / 10.44) * pow(2.0 * r, -3.4);
 		mieOutput << N_mineral[counter] << endl;
-		//std::cout << "Number Density Mineral: " << N_mineral[counter] << endl;
 		++counter;
 	}
 	mieOutput << " " << endl;
@@ -46,7 +110,6 @@ int main() {
 	for (double r = rMin_algae + algae_stepSize * 0.5; r < rMax_algae; r += algae_stepSize) {
 		N_algae[counter] = (1.904e-6 / 4.97) * pow(2.0 * r, -3.6);
 		mieOutput << N_algae[counter] << endl;
-		//std::cout << "Number Density Algae: " << N_algae[counter] << endl;
 		++counter;
 	}
 	mieOutput << " " << endl;
@@ -80,13 +143,13 @@ int main() {
 		}
 	};
 
-	double rMax_water = 2.0e-5;
-	double rMin_water = 1.0e-7;
-	double water_stepSize = rMin_water;
+	double rMax_water = 2e-5;
+	double rMin_water = 2e-7;
+	double water_stepSize = rMin_water * 2.0;
 
 	LogNormalParticleDistribution CloudLogNormal{
-		4.0e-6,
-		CloudLogNormal.mean * 0.20
+		8.0e-7,
+		CloudLogNormal.mean * 1.5
 	};
 
 	valarray<double> N_cloud;
@@ -113,7 +176,7 @@ int main() {
 		++counter;
 	}
 
-	double waterWeight = 0.5;
+	double waterWeight = 0.0005;
 	double waterDensity = 1000.0;
 	double waterVolume = waterWeight < 1e-12 ? 0.0 : waterWeight / waterDensity;
 	double airVolume = 1.0 - waterVolume;
@@ -168,6 +231,7 @@ int main() {
 
 		//*
 		double phase = 0.0;
+		double phaseAsymmetry = 0.0;
 		double scattering = 0.0;
 		double extinction = 0.0;
 		double absorption = 0.0;
@@ -177,8 +241,10 @@ int main() {
 			extinction += absorptionMedium + (Bulk.extinction);
 			scattering += Bulk.scattering;
 			phase += Bulk.phase * Bulk.scattering;
+			phaseAsymmetry += Bulk.phaseAsymmetry * Bulk.scattering;
 		}
 		phase *= 1.0 / scattering;
+		phaseAsymmetry *= 1.0 / scattering;
 
 		scatteringCoefficient = scattering;
 		extinctionCoefficient = extinction;
@@ -193,7 +259,8 @@ int main() {
 		double Qabs;
 		double Qext;
 		double phase;
-		ComputeParticleProperties(iorHost, complex<double>(1.33257, 1.67e-8), theta, 5.0e-8, 6.50e-7, S1, S2, Qabs, Qsca, Qext, phase);
+		double phaseAsymmetry;
+		ComputeParticleProperties(iorHost, complex<double>{ 1.3330, 1.9600e-9 }, theta, rMax_water, lambda, S1, S2, Qabs, Qsca, Qext, phase, phaseAsymmetry);
 
 		scatteringCoefficient = Qsca;
 		extinctionCoefficient = Qext;
@@ -206,12 +273,6 @@ int main() {
 		cout << phase << endl;
 
 		//fprintf(stderr, "\b\b\b\b\%3d%c", (100 * n / angles), '%');
-
-		//cout << SphYn(100, complex<double>(theta, theta * 0.1)) << ", " << sph_neumann(100, theta) << ", " << abs(SphYn(100, complex<double>(theta, theta * 0.1)).real() - sph_neumann(100, theta)) << endl;
-
-		//cout << Factorial(n) << ", " << tgamma(n + 1) << ", " << n << endl;
-
-		//cout << TermsToSum(iorHost * (tau * rMax_water / lambda)) << endl;
 	}
 	cout << " " << endl;
 	mieOutput << " " << endl;

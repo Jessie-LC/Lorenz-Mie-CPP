@@ -26,11 +26,11 @@ struct ParticleDistribution {
 
 struct BulkMedium {
 	double extinction, scattering, absorption;
-	double phase;
+	double phase, phaseAsymmetry;
 };
 
 unsigned int TermsToSum(const complex<double> z);
 
-void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParticle, double theta, double r, double lambda, complex<double>& S1, complex<double>& S2, double& Qabs, double& Qsca, double& Qext, double& phase);
+void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParticle, double theta, double r, double lambda, complex<double>& S1, complex<double>& S2, double& Qabs, double& Qsca, double& Qext, double& phase, double& asymmetry);
 
 void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle, BulkMedium& bulk);

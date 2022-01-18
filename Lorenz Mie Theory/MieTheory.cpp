@@ -165,21 +165,21 @@ void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, c
 
 unsigned int TermsToSum(const complex<double> z) {
 	double size = abs(z);
-	return static_cast<unsigned int>(ceil(size + 215.0 * cbrt(size) + 1.0));
+	return static_cast<unsigned int>(ceil(size + 150.0 * cbrt(size) + 1.0));
 }
 
-void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Cabs, double& Csca, double& Cext, double& phase) {
+void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Cabs, double& Csca, double& Cext, double& phase, double& asymmetry) {
 	double size = 2.0 * pi * radius / lambda;
 	M = TermsToSum(iorHost * size);
 	AallN(hostA, iorHost * size);
 	AallN(particleA, iorParticle * size);
 
-	double sum = 0.0;
-
 	LorenzMie_ab(1, size, iorHost, iorParticle);
 
 	double cosTheta = cos(theta);
 
+	double sum = 0.0;
+	double asymmetrySum = 0.0;
 	double crossSectionEXT = 0.0;
 	for (unsigned int n = 1; n < M; ++n) {
 		double PiN = computePi(cosTheta, n);
@@ -188,10 +188,12 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 		complex<double> a_n = a;
 		complex<double> b_n = b;
 
-		double tmp = (2.0 * n + 1.0) / (n * (n + 1.0));
-		S1 += tmp * (a_n * PiN + b_n * TauN);
-		S2 += tmp * (a_n * TauN + b_n * PiN);
+		double tmp1 = (2.0 * n + 1.0) / (n * (n + 1.0));
+		double tmp2 = (n * (n + 2) / (n + 1));
+		S1 += tmp1 * (a_n * PiN + b_n * TauN);
+		S2 += tmp1 * (a_n * TauN + b_n * PiN);
 		sum += (2.0 * n + 1.0) * (sqr(abs(a_n)) + sqr(abs(b_n)));
+		asymmetrySum += tmp2 * real(a_n * conj(a_n) + b_n * conj(b_n)) + tmp1 * real(a_n*conj(b_n)); //Not sure this is actually implemented.
 
 		crossSectionEXT += (2.0 * n + 1.0) * real((a_n + b_n) / (iorHost * iorHost));
 
@@ -211,6 +213,34 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 	Cabs = Cext - Csca;
 
 	phase = (sqr(abs(S1)) + sqr(abs(S2))) / (2.0 * sqr(abs(k)) * Csca);
+	asymmetry = asymmetrySum / (0.5 * sum);
+}
+
+void RayleighPhase(double cosTheta, double radius, double lambda, complex<double> ior, complex<double>& S1, complex<double>& S2, double& Cabs, double& Csca, double& Cext, double& phase, double& asymmetry) {
+	//This function is not properly normalized.
+	double x = 2.0 * pi * radius / lambda;
+
+	complex<double> a1 = (2.0 * (x * x * x)) / 3.0 * ((ior * ior) - 1.0) / ((ior * ior) + 2.0) * complex<double>(0.0, 1.0);
+	a1 += (2.0 * (x * x * x * x * x)) / 5.0 * ((ior * ior) - 2.0) * ((ior * ior) + 1.0) / (((ior * ior) + 2.0) * ((ior * ior) + 2.0)) * complex<double>(0.0, 1.0);
+
+	S1 = 1.5 * a1 * 1.0;
+	S2 = 1.5 * a1 * cosTheta;
+
+	complex<double> ratio = ((ior * ior) - 1.0) / ((ior * ior) + 2.0);
+	complex<double> extinction = 4.0 * x * ratio * (1.0 + sqr(x) / 15.0 * ratio * ((ior * ior * ior * ior) + 27.0 * (ior * ior) + 38.0) / (2.0 * (ior * ior) + 3.0));
+
+	double Qsca = 8.0 / 3.0 * pow(x, 4.0) * sqr(abs(ratio));
+	double Qext = abs(extinction.imag() + Qsca);
+
+	double G = pi * sqr(radius);
+
+	Csca = Qsca * G;
+	Cext = Qext * G;
+	Cabs = Cext - Csca;
+
+	double factor = sqrt(pi * Qext) * x;
+	phase = (sqr(abs(S1 / factor)) + sqr(abs(S2 / factor))) / 2.0;
+	asymmetry = 0.0;
 }
 
 void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle, BulkMedium& bulk) {
@@ -220,6 +250,7 @@ void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double 
 		Secontion 2.2: Bulk Optical Properties
 	*/
 	double phase = 0.0;
+	double phaseAsymmetry = 0.0;
 	double scatteringSigma = 0.0;
 	double extinctionSigma = 0.0;
 	int counter = 0;
@@ -230,18 +261,25 @@ void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double 
 		double Cabs;
 		double Cext;
 		double particlePhase;
-		ComputeParticleProperties(iorHost, particle.ior, theta, r, lambda, S1, S2, Cabs, Csca, Cext, particlePhase);
+		double particlePhaseAsymmetry;
+		if (r > 4e-8) {
+			ComputeParticleProperties(iorHost, particle.ior, theta, r, lambda, S1, S2, Cabs, Csca, Cext, particlePhase, particlePhaseAsymmetry);
+		} else {
+			RayleighPhase(cos(theta), r, lambda, particle.ior, S1, S2, Cabs, Csca, Cext, particlePhase, particlePhaseAsymmetry);
+		}
 
 		double sigmaS = Csca * particle.N[counter] * particle.stepSize;
 
 		scatteringSigma += sigmaS;
 		extinctionSigma += Cext * particle.N[counter] * particle.stepSize;
 		phase += Csca * particlePhase * particle.N[counter] * particle.stepSize;
+		phaseAsymmetry += Csca * particlePhaseAsymmetry * particle.N[counter] * particle.stepSize;
 
 		++counter;
 	}
 
 	bulk.phase = (1.0 / scatteringSigma) * phase;
+	bulk.phaseAsymmetry = (1.0 / scatteringSigma) * phaseAsymmetry;
 	bulk.scattering = scatteringSigma;
 	bulk.extinction = extinctionSigma;
 	bulk.absorption = extinctionSigma - scatteringSigma;
