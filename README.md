@@ -1,5 +1,5 @@
 # Lorenz-Mie-CPP
-Implementation of the Generalized Lorenz Mie theory in C++.
+Implementation of the Generalized Lorenz Mie Theory in C++.
 
 References:
 
