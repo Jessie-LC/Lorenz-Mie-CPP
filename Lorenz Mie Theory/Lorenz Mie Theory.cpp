@@ -6,77 +6,95 @@
 
 using namespace std;
 
-const int angles = 3600;
+const int angles = 360;
 const int wavelengths = 441;
 
-template <typename T> int sgn(T val) {
-	return (T(0) < val) - (val < T(0));
-}
-
-double HenyeyGreensteinPhase(double cosTheta, double g) {
-	const double norm = 0.25 / pi;
-
-	double gg = g * g;
-	return norm * ((1.0 - gg) / pow(1.0 + gg - 2.0 * g * cosTheta, 3.0 / 2.0));
-}
-
-double HenyeyGreensteinLegendre(double cosTheta, double g) {
-	double gg = g * g;
-	double P = 0.0;
-	for (int i = 0; i < 500; ++i) {
-		P += sgn((2.0 * i + 1.0) * pow(g, i)) * Pn(cosTheta, i);
+int BinarySearch(int lowIndex, int highIndex, double toFind, const double arr[]) {
+	while (lowIndex < highIndex) {
+		int midIndex = (lowIndex + highIndex) >> 1;
+		if (arr[midIndex] < toFind) {
+			lowIndex = midIndex + 1;
+		}
+		else if (arr[midIndex] > toFind) {
+			highIndex = midIndex;
+		}
+		else {
+			return midIndex;
+		}
 	}
-	return P / 12.5663706;
+	return -1;
 }
 
-double CornetteShanks(double cosTheta, double g) {
-	double gg = g * g;
-	double p1 = 1.5 * ((1.0 - gg) / (2.0 + gg));
-	double p2 = (1.0 + sqr(cosTheta)) / (pow((1.0 + gg - 2.0 * g * cosTheta), 3.0 / 2.0));
-	double phase = (p1 * p2);
-	phase /= 12.5663706;
-	return phase;
-}
+complex<double> WaterIOR(double wavelength) {
+	double lambdaMin = wavelength - 0.5, lambdaMax = wavelength + 0.5;
+	double start = max(lambdaMin, WaterWavelengths[0]);
+	double end = min(lambdaMax, WaterWavelengths[31]);
 
-double CornetteShanksLegendre(double cosTheta, double g) {
-	double gg = g * g;
-	double P = 0.0;
-	for (int i = 0; i < 500; ++i) {
-		double tmp1 = i * (i - 1) / (2.0 * i - 1.0);
-		double tmp2 = (((5.0 * sqr((double)i) - 1.0) / (2.0 * i - 1.0)) + (sqr(i + 1.0) / (2.0 * i + 3.0))) * pow(g, i);
-		double tmp3 = (((i + 1.0) * (i + 2.0)) / (2.0 * i + 3.0)) * pow(g, i + 2.0);
-		P += sgn(tmp1 + tmp2 + tmp3) * Pn(cosTheta, i);
-	}
-	return 1.5 * (1.0 / (2.0 + gg)) * P;
-}
+	int idx = int(glm::max(glm::distance(0.0, double(BinarySearch(0, 31, start, WaterWavelengths))), 1.0) - 1.0);
 
-/*
-
-float LambdaSample() {
-	float r = RandNextF(), g;
-	int i;
-	for (i = 0; i < 441 && r >= 0.0; i++) {
-		g = dot(cie[i], 1.0 / vec3(113.042)) / 3.0;
-		r -= g * 1.0;
-	}
-
-	return float(390 + i) + r / g;
-}
-
-float LambdaPdf(float w) {
-	float n = (w - 390.0);
-	int i = int(n);
-	if(i < 0 || i >= (830-390)) {
+	if (end <= start) {
 		return 0.0;
 	}
-	return (dot(cie[i], 1.0 / vec3(113.042)) * 441.0);
-}
 
-*/
+	double waterN = 0.0;
+	{
+		double result = 0.0;
+		int entry = idx;
+		for (; entry < 32 && end >= WaterWavelengths[entry]; ++entry) {
+			double a = WaterWavelengths[entry],
+				b = WaterWavelengths[entry + 1],
+				ca = max(a, start),
+				cb = min(b, end),
+				fa = WaterN[entry],
+				fb = WaterN[entry + 1],
+				invAB = 1.0 / (b - a);
+
+			if (ca >= cb) {
+				continue;
+			}
+
+			double interpA = glm::mix(fa, fb, (ca - a) * invAB);
+			double interpB = glm::mix(fa, fb, (cb - a) * invAB);
+
+			result += 0.5 * (interpA + interpB) * (cb - ca);
+		}
+
+		waterN = result / (lambdaMax - lambdaMin);
+	}
+
+	double waterK = 0.0;
+	{
+		double result = 0.0;
+		int entry = idx;
+		for (; entry < 32 && end >= WaterWavelengths[entry]; ++entry) {
+			double a = WaterWavelengths[entry],
+				b = WaterWavelengths[entry + 1],
+				ca = max(a, start),
+				cb = min(b, end),
+				fa = WaterK[entry],
+				fb = WaterK[entry + 1],
+				invAB = 1.0 / (b - a);
+
+			if (ca >= cb) {
+				continue;
+			}
+
+			double interpA = glm::mix(fa, fb, (ca - a) * invAB);
+			double interpB = glm::mix(fa, fb, (cb - a) * invAB);
+
+			result += 0.5 * (interpA + interpB) * (cb - ca);
+		}
+
+		waterK = result / (lambdaMax - lambdaMin);
+	}
+	return complex<double>(waterN, waterK);
+}
 
 int main() {
 	ofstream mieOutput;
 	mieOutput.open("Mie Outputs.txt");
+
+	double lambda = 0.550e-6;
 
 	complex<double> iorHost = complex<double>{ 1.00028, 0.0 };
 
@@ -191,7 +209,7 @@ int main() {
 	}
 
 	ParticleDistribution clouds{
-		complex<double>{ 1.3330, 1.9600e-9 },
+		WaterIOR(lambda * 1e9),
 		rMin_water,
 		rMax_water,
 		water_stepSize,
@@ -204,8 +222,6 @@ int main() {
 	Particles[0] = clouds;
 	Particles[1] = mineral;
 
-	double lambda = 0.550e-6;
-	
 	glm::vec3 mieData[angles];
 
 	double absorptionMedium = 4.0 * pi * imag(iorHost) / lambda;

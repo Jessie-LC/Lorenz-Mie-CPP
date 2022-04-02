@@ -147,14 +147,14 @@ void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, c
 	complex<double> hostZ = iorHost * size;
 	complex<double> particleZ = iorParticle * size;
 
-	/*
+	//*
 	a = (iorHost * PsiPrime(n, particleZ) * Psi(n, hostZ) - iorParticle * Psi(n, particleZ) * PsiPrime(n, hostZ)) / 
 		(iorHost * PsiPrime(n, particleZ) * Zeta(n, hostZ) - iorParticle * Psi(n, particleZ) * ZetaPrime(n, hostZ));
 	b = (iorParticle * PsiPrime(n, particleZ) * Psi(n, hostZ) - iorHost * Psi(n, particleZ) * PsiPrime(n, hostZ)) /
 		(iorParticle * PsiPrime(n, particleZ) * Zeta(n, hostZ) - iorHost * Psi(n, particleZ) * ZetaPrime(n, hostZ));
 	//*/
 
-	//*
+	/*
 	complex<double> B_n = B(n, hostZ, hostA);
 	complex<double> R_n = R(n, hostZ, hostA);
 
@@ -165,7 +165,7 @@ void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, c
 
 unsigned int TermsToSum(const complex<double> z) {
 	double size = abs(z);
-	return static_cast<unsigned int>(ceil(size + 150.0 * cbrt(size) + 1.0));
+	return static_cast<unsigned int>(ceil(size + 4.3 * cbrt(size) + 1.0));
 }
 
 void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParticle, double theta, double radius, double lambda, complex<double>& S1, complex<double>& S2, double& Cabs, double& Csca, double& Cext, double& phase, double& asymmetry) {
@@ -243,6 +243,22 @@ void RayleighPhase(double cosTheta, double radius, double lambda, complex<double
 	asymmetry = 0.0;
 }
 
+double HenyeyGreensteinPhase(double cosTheta, double g) {
+	const double norm = 0.25 / pi;
+
+	double gg = g * g;
+	return norm * ((1.0 - gg) / pow(1.0 + gg - 2.0 * g * cosTheta, 3.0 / 2.0));
+}
+
+double CornetteShanks(double cosTheta, double g) {
+	double gg = g * g;
+	double p1 = 1.5 * ((1.0 - gg) / (2.0 + gg));
+	double p2 = (1.0 + sqr(cosTheta)) / (pow((1.0 + gg - 2.0 * g * cosTheta), 3.0 / 2.0));
+	double phase = (p1 * p2);
+	phase /= 12.5663706;
+	return phase;
+}
+
 void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double lambda, ParticleDistribution& particle, BulkMedium& bulk) {
 	/*
 		https://cseweb.ucsd.edu//~henrik/papers/lorenz_mie_theory/computing_scattering_properties_using_lorenz_mie_theory.pdf
@@ -262,11 +278,7 @@ void ComputeBulkOpticalProperties(complex<double> iorHost, double theta, double 
 		double Cext;
 		double particlePhase;
 		double particlePhaseAsymmetry;
-		if (r > 4e-8) {
-			ComputeParticleProperties(iorHost, particle.ior, theta, r, lambda, S1, S2, Cabs, Csca, Cext, particlePhase, particlePhaseAsymmetry);
-		} else {
-			RayleighPhase(cos(theta), r, lambda, particle.ior, S1, S2, Cabs, Csca, Cext, particlePhase, particlePhaseAsymmetry);
-		}
+		ComputeParticleProperties(iorHost, particle.ior, theta, r, lambda, S1, S2, Cabs, Csca, Cext, particlePhase, particlePhaseAsymmetry);
 
 		double sigmaS = Csca * particle.N[counter] * particle.stepSize;
 

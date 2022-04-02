@@ -26,9 +26,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bessel.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="complexMath.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -42,9 +39,6 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Utility.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="besselComplex.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

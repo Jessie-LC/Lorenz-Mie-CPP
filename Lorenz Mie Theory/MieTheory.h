@@ -27,6 +27,7 @@ struct ParticleDistribution {
 struct BulkMedium {
 	double extinction, scattering, absorption;
 	double phase, phaseAsymmetry;
+	double phaseCS, phaseHG;
 };
 
 unsigned int TermsToSum(const complex<double> z);
