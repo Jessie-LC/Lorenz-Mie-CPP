@@ -1,5 +1,6 @@
 #include "Utility.h"
 #include "MieTheory.h"
+#include "IndexOfRefraction.h"
 
 #include <tuple>
 #include <limits>
@@ -9,94 +10,13 @@ using namespace std;
 const int angles = 360;
 const int wavelengths = 441;
 
-int BinarySearch(int lowIndex, int highIndex, double toFind, const double arr[]) {
-	while (lowIndex < highIndex) {
-		int midIndex = (lowIndex + highIndex) >> 1;
-		if (arr[midIndex] < toFind) {
-			lowIndex = midIndex + 1;
-		}
-		else if (arr[midIndex] > toFind) {
-			highIndex = midIndex;
-		}
-		else {
-			return midIndex;
-		}
-	}
-	return -1;
-}
-
-complex<double> WaterIOR(double wavelength) {
-	double lambdaMin = wavelength - 0.5, lambdaMax = wavelength + 0.5;
-	double start = max(lambdaMin, WaterWavelengths[0]);
-	double end = min(lambdaMax, WaterWavelengths[31]);
-
-	int idx = int(glm::max(glm::distance(0.0, double(BinarySearch(0, 31, start, WaterWavelengths))), 1.0) - 1.0);
-
-	if (end <= start) {
-		return 0.0;
-	}
-
-	double waterN = 0.0;
-	{
-		double result = 0.0;
-		int entry = idx;
-		for (; entry < 32 && end >= WaterWavelengths[entry]; ++entry) {
-			double a = WaterWavelengths[entry],
-				b = WaterWavelengths[entry + 1],
-				ca = max(a, start),
-				cb = min(b, end),
-				fa = WaterN[entry],
-				fb = WaterN[entry + 1],
-				invAB = 1.0 / (b - a);
-
-			if (ca >= cb) {
-				continue;
-			}
-
-			double interpA = glm::mix(fa, fb, (ca - a) * invAB);
-			double interpB = glm::mix(fa, fb, (cb - a) * invAB);
-
-			result += 0.5 * (interpA + interpB) * (cb - ca);
-		}
-
-		waterN = result / (lambdaMax - lambdaMin);
-	}
-
-	double waterK = 0.0;
-	{
-		double result = 0.0;
-		int entry = idx;
-		for (; entry < 32 && end >= WaterWavelengths[entry]; ++entry) {
-			double a = WaterWavelengths[entry],
-				b = WaterWavelengths[entry + 1],
-				ca = max(a, start),
-				cb = min(b, end),
-				fa = WaterK[entry],
-				fb = WaterK[entry + 1],
-				invAB = 1.0 / (b - a);
-
-			if (ca >= cb) {
-				continue;
-			}
-
-			double interpA = glm::mix(fa, fb, (ca - a) * invAB);
-			double interpB = glm::mix(fa, fb, (cb - a) * invAB);
-
-			result += 0.5 * (interpA + interpB) * (cb - ca);
-		}
-
-		waterK = result / (lambdaMax - lambdaMin);
-	}
-	return complex<double>(waterN, waterK);
-}
-
 int main() {
 	ofstream mieOutput;
 	mieOutput.open("Mie Outputs.txt");
 
 	double lambda = 0.550e-6;
 
-	complex<double> iorHost = complex<double>{ 1.00028, 0.0 };
+	complex<double> iorHost = complex<double>(1.00028, 0.0);
 
 	double rMax_mineral = 100e-6;
 	double rMin_mineral = 0.05e-6;
@@ -161,9 +81,9 @@ int main() {
 		}
 	};
 
-	double rMax_water = 2e-5;
-	double rMin_water = 2e-7;
-	double water_stepSize = rMin_water * 2.0;
+	double rMax_water = 1e-5;
+	double rMin_water = 5e-7;
+	double water_stepSize = rMin_water * 1.0;
 
 	LogNormalParticleDistribution CloudLogNormal{
 		8.0e-7,

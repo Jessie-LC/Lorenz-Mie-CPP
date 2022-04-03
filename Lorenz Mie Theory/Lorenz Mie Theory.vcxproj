@@ -149,6 +149,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="IndexOfRefraction.cpp" />
     <ClCompile Include="Lorenz Mie Theory.cpp" />
     <ClCompile Include="MieTheory.cpp" />
     <ClCompile Include="Utility.cpp" />
@@ -156,6 +157,7 @@
   <ItemGroup>
     <ClInclude Include="complexMath.h" />
     <ClInclude Include="constants.h" />
+    <ClInclude Include="IndexOfRefraction.h" />
     <ClInclude Include="lorenzMie.h" />
     <ClInclude Include="MieTheory.h" />
     <ClInclude Include="Utility.h" />
