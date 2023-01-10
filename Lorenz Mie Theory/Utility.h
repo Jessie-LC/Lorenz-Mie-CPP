@@ -16,23 +16,17 @@ const double tau = pi * 2.0;
 
 const double epsilon = 1e-5;
 
-double Pn(double x, int n);
+struct LegendreDerivatives {
+	double value;
+	double derivative1;
+	double derivative2;
+};
 
-double derivativeLegendre(int n, double x);
-
-double computePi(double mu, int n);
-
-double derivativePi(double x, int n);
-
-double computeTau(double mu, int n);
+void LegendreBulk(double x, int n, double out0[], double out1[], double out2[]);
+LegendreDerivatives LegendreAll(double x, int n);
 
 double Factorial(int n);
 double T_Gamma(double z);
 std::complex<double> SphJn(int n, std::complex<double> z);
 std::complex<double> SphYn(int n, std::complex<double> z);
-
-double sqr(double x);
-
-glm::dvec3 xyzToRGB(glm::dvec3 xyz);
-
-glm::dvec3 SpectrumToXYZ(glm::dvec3 spectrum, float w);
+glm::vec3 SpectrumToXYZ(float spectrum, float w);

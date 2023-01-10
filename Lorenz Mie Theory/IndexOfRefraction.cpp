@@ -20,6 +20,126 @@ int BinarySearch(int lowIndex, int highIndex, double toFind, const double arr[])
 	return -1;
 }
 
+complex<double> BrineIOR(double wavelength) {
+	double lambdaMin = wavelength - 0.5, lambdaMax = wavelength + 0.5;
+	double start = glm::max(lambdaMin, OceanWavelengths[0]);
+	double end = glm::min(lambdaMax, OceanWavelengths[16]);
+
+	int idx = int(glm::max(glm::distance(0.0, double(BinarySearch(0, 16, start, OceanWavelengths))), 1.0) - 1.0);
+
+	if (end <= start) {
+		return 0.0;
+	}
+
+	double brineK = 0.0;
+	{
+		double result = 0.0;
+		int entry = idx;
+		for (; entry < 16 && end >= OceanWavelengths[entry]; ++entry) {
+			double a = OceanWavelengths[entry],
+				b = OceanWavelengths[entry + 1],
+				ca = max(a, start),
+				cb = min(b, end),
+				fa = BrineK[entry],
+				fb = BrineK[entry + 1],
+				invAB = 1.0 / (b - a);
+
+			if (ca >= cb) {
+				continue;
+			}
+
+			double interpA = glm::mix(fa, fb, (ca - a) * invAB);
+			double interpB = glm::mix(fa, fb, (cb - a) * invAB);
+
+			result += 0.5 * (interpA + interpB) * (cb - ca);
+		}
+
+		brineK = result / (lambdaMax - lambdaMin);
+	}
+
+	return complex<double>(1.34, brineK);
+}
+
+double InterpAlgaeK(double wavelength) {
+	double lambdaMin = wavelength - 0.5, lambdaMax = wavelength + 0.5;
+	double start = glm::max(lambdaMin, OceanWavelengths[0]);
+	double end = glm::min(lambdaMax, OceanWavelengths[16]);
+
+	int idx = int(glm::max(glm::distance(0.0, double(BinarySearch(0, 16, start, OceanWavelengths))), 1.0) - 1.0);
+
+	if (end <= start) {
+		return 0.0;
+	}
+
+	double algaeK = 0.0;
+	{
+		double result = 0.0;
+		int entry = idx;
+		for (; entry < 16 && end >= OceanWavelengths[entry]; ++entry) {
+			double a = OceanWavelengths[entry],
+				b = OceanWavelengths[entry + 1],
+				ca = max(a, start),
+				cb = min(b, end),
+				fa = AlgaeK[entry],
+				fb = AlgaeK[entry + 1],
+				invAB = 1.0 / (b - a);
+
+			if (ca >= cb) {
+				continue;
+			}
+
+			double interpA = glm::mix(fa, fb, (ca - a) * invAB);
+			double interpB = glm::mix(fa, fb, (cb - a) * invAB);
+
+			result += 0.5 * (interpA + interpB) * (cb - ca);
+		}
+
+		algaeK = result / (lambdaMax - lambdaMin);
+	}
+
+	return algaeK;
+}
+
+double InterpMineralK(double wavelength) {
+	double lambdaMin = wavelength - 0.5, lambdaMax = wavelength + 0.5;
+	double start = glm::max(lambdaMin, OceanWavelengths[0]);
+	double end = glm::min(lambdaMax, OceanWavelengths[16]);
+
+	int idx = int(glm::max(glm::distance(0.0, double(BinarySearch(0, 16, start, OceanWavelengths))), 1.0) - 1.0);
+
+	if (end <= start) {
+		return 0.0;
+	}
+
+	double mineralK = 0.0;
+	{
+		double result = 0.0;
+		int entry = idx;
+		for (; entry < 16 && end >= OceanWavelengths[entry]; ++entry) {
+			double a = OceanWavelengths[entry],
+				b = OceanWavelengths[entry + 1],
+				ca = max(a, start),
+				cb = min(b, end),
+				fa = MineralK[entry],
+				fb = MineralK[entry + 1],
+				invAB = 1.0 / (b - a);
+
+			if (ca >= cb) {
+				continue;
+			}
+
+			double interpA = glm::mix(fa, fb, (ca - a) * invAB);
+			double interpB = glm::mix(fa, fb, (cb - a) * invAB);
+
+			result += 0.5 * (interpA + interpB) * (cb - ca);
+		}
+
+		mineralK = result / (lambdaMax - lambdaMin);
+	}
+
+	return mineralK;
+}
+
 complex<double> WaterIOR(double wavelength) {
 	double lambdaMin = wavelength - 0.5, lambdaMax = wavelength + 0.5;
 	double start = glm::max(lambdaMin, WaterWavelengths[0]);

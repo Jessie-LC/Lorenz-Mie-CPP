@@ -147,14 +147,14 @@ void LorenzMie_ab(unsigned int n, double size, const complex<double>& iorHost, c
 	complex<double> hostZ = iorHost * size;
 	complex<double> particleZ = iorParticle * size;
 
-	//*
+	/*
 	a = (iorHost * PsiPrime(n, particleZ) * Psi(n, hostZ) - iorParticle * Psi(n, particleZ) * PsiPrime(n, hostZ)) / 
 		(iorHost * PsiPrime(n, particleZ) * Zeta(n, hostZ) - iorParticle * Psi(n, particleZ) * ZetaPrime(n, hostZ));
 	b = (iorParticle * PsiPrime(n, particleZ) * Psi(n, hostZ) - iorHost * Psi(n, particleZ) * PsiPrime(n, hostZ)) /
 		(iorParticle * PsiPrime(n, particleZ) * Zeta(n, hostZ) - iorHost * Psi(n, particleZ) * ZetaPrime(n, hostZ));
 	//*/
 
-	/*
+	//*
 	complex<double> B_n = B(n, hostZ, hostA);
 	complex<double> R_n = R(n, hostZ, hostA);
 
@@ -177,22 +177,23 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 	LorenzMie_ab(1, size, iorHost, iorParticle);
 
 	double cosTheta = cos(theta);
+	double sinTheta = sin(theta);
 
 	double sum = 0.0;
 	double asymmetrySum = 0.0;
 	double crossSectionEXT = 0.0;
 	for (unsigned int n = 1; n < M; ++n) {
-		double PiN = computePi(cosTheta, n);
-		double TauN = computeTau(cosTheta, n);
+		LegendreDerivatives legendrePolynomial = LegendreAll(cosTheta, n);
+		double TauN = cosTheta * legendrePolynomial.derivative1 - pow(sinTheta, 2.0) * legendrePolynomial.derivative2;
 
 		complex<double> a_n = a;
 		complex<double> b_n = b;
 
 		double tmp1 = (2.0 * n + 1.0) / (n * (n + 1.0));
 		double tmp2 = (n * (n + 2) / (n + 1));
-		S1 += tmp1 * (a_n * PiN + b_n * TauN);
-		S2 += tmp1 * (a_n * TauN + b_n * PiN);
-		sum += (2.0 * n + 1.0) * (sqr(abs(a_n)) + sqr(abs(b_n)));
+		S1 += tmp1 * (a_n * legendrePolynomial.derivative1 + b_n * TauN);
+		S2 += tmp1 * (a_n * TauN + b_n * legendrePolynomial.derivative1);
+		sum += (2.0 * n + 1.0) * (pow(abs(a_n), 2.0) + pow(abs(b_n), 2.0));
 		asymmetrySum += tmp2 * real(a_n * conj(a_n) + b_n * conj(b_n)) + tmp1 * real(a_n*conj(b_n)); //Not sure this is actually implemented.
 
 		crossSectionEXT += (2.0 * n + 1.0) * real((a_n + b_n) / (iorHost * iorHost));
@@ -203,16 +204,16 @@ void ComputeParticleProperties(complex<double> iorHost, complex<double> iorParti
 	double alpha = 4.0 * pi * radius * imag(iorHost) / lambda;
 	double y = alpha < 10e-6 ? 1.0 : (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
 	double term1 = pow(lambda, 2.0) * exp(-alpha);
-	double term2 = 2.0 * pi * y * sqr(abs(iorHost));
+	double term2 = 2.0 * pi * y * pow(abs(iorHost), 2.0);
 
 	complex<double> k = 2.0 * pi * iorHost / lambda;
 
 	Csca = term1 / term2 * sum;
-	Cext = (sqr(lambda) / tau) * crossSectionEXT;
+	Cext = (pow(lambda, 2.0) / tau) * crossSectionEXT;
 
 	Cabs = Cext - Csca;
 
-	phase = (sqr(abs(S1)) + sqr(abs(S2))) / (2.0 * sqr(abs(k)) * Csca);
+	phase = (pow(abs(S1), 2.0) + pow(abs(S2), 2.0)) / (2.0 * pow(abs(k), 2.0) * Csca);
 	asymmetry = asymmetrySum / (0.5 * sum);
 }
 
@@ -227,19 +228,19 @@ void RayleighPhase(double cosTheta, double radius, double lambda, complex<double
 	S2 = 1.5 * a1 * cosTheta;
 
 	complex<double> ratio = ((ior * ior) - 1.0) / ((ior * ior) + 2.0);
-	complex<double> extinction = 4.0 * x * ratio * (1.0 + sqr(x) / 15.0 * ratio * ((ior * ior * ior * ior) + 27.0 * (ior * ior) + 38.0) / (2.0 * (ior * ior) + 3.0));
+	complex<double> extinction = 4.0 * x * ratio * (1.0 + pow(x, 2.0) / 15.0 * ratio * ((ior * ior * ior * ior) + 27.0 * (ior * ior) + 38.0) / (2.0 * (ior * ior) + 3.0));
 
-	double Qsca = 8.0 / 3.0 * pow(x, 4.0) * sqr(abs(ratio));
+	double Qsca = 8.0 / 3.0 * pow(x, 4.0) * pow(abs(ratio), 2.0);
 	double Qext = abs(extinction.imag() + Qsca);
 
-	double G = pi * sqr(radius);
+	double G = pi * pow(radius, 2.0);
 
 	Csca = Qsca * G;
 	Cext = Qext * G;
 	Cabs = Cext - Csca;
 
 	double factor = sqrt(pi * Qext) * x;
-	phase = (sqr(abs(S1 / factor)) + sqr(abs(S2 / factor))) / 2.0;
+	phase = (pow(abs(S1 / factor), 2.0) + pow(abs(S2 / factor), 2.0)) / 2.0;
 	asymmetry = 0.0;
 }
 
@@ -253,7 +254,7 @@ double HenyeyGreensteinPhase(double cosTheta, double g) {
 double CornetteShanks(double cosTheta, double g) {
 	double gg = g * g;
 	double p1 = 1.5 * ((1.0 - gg) / (2.0 + gg));
-	double p2 = (1.0 + sqr(cosTheta)) / (pow((1.0 + gg - 2.0 * g * cosTheta), 3.0 / 2.0));
+	double p2 = (1.0 + pow(cosTheta, 2.0)) / (pow((1.0 + gg - 2.0 * g * cosTheta), 3.0 / 2.0));
 	double phase = (p1 * p2);
 	phase /= 12.5663706;
 	return phase;
