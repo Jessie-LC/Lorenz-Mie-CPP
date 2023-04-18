@@ -269,25 +269,25 @@ int main()
 	double rMin_water = mean / 10.0;
 	double water_stepSize = rMin_water * 1.0;
 	switch (aerosolType) {
-	case 0: {
-		break;
-	}
-	case 1: {
-		rMax_water = 4e-4;
-		rMin_water = 1e-4;
-		water_stepSize = rMin_water * 1.0;
-		mean = rMax_water - rMin_water;
-		standardDeviation = mean * 20.0;
-		break;
-	}
-	case 2: {
-		rMax_water = 4e-8;
-		rMin_water = 5e-9;
-		water_stepSize = rMin_water * 1.0;
-		mean = rMax_water - rMin_water;
-		standardDeviation = mean * 20.0;
-		break;
-	}
+		case 0: {
+			break;
+		}
+		case 1: {
+			rMax_water = 4e-4;
+			rMin_water = 1e-4;
+			water_stepSize = rMin_water * 1.0;
+			mean = rMax_water - rMin_water;
+			standardDeviation = mean * 20.0;
+			break;
+		}
+		case 2: {
+			rMax_water = 5e-8;
+			rMin_water = 5e-9;
+			water_stepSize = rMin_water * 1.0;
+			mean = rMax_water - rMin_water;
+			standardDeviation = mean * 20.0;
+			break;
+		}
 	}
 
 	std::valarray<double> N_water;
@@ -310,7 +310,7 @@ int main()
 		double rainbow = pow(2.0 * x, -3.5);
 		double cumulus = 2.373 * pow(x, 6.0) * exp(-1.5 * x);
 		double haze = 5.33e4 * pow(x, 4.0) * exp(-8.9 * pow(x, 0.5));
-		N_water[counter] = haze;
+		N_water[counter] = cumulus;
 		volume += pow(r, 3.0) * N_water[counter] * water_stepSize;
 		++counter;
 	}
