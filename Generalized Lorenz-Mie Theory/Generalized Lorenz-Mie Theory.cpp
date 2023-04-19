@@ -260,7 +260,7 @@ int main()
 	particles[0] = algae;
 	particles[1] = mineral;
 #else
-	const int aerosolType = 0;
+	const int aerosolType = 1;
 	double mean = 8.0e-7;
 	double standardDeviation = mean * 1.5;
 

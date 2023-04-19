@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "*.fsh": "glsl",
-        "*.csh": "glsl",
-        "*.vsh": "glsl",
-        "*.gsh": "glsl",
-        "ostream": "cpp"
-    }
-}
