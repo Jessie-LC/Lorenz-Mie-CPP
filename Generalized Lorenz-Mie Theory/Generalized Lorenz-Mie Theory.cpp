@@ -8,12 +8,13 @@
 
 //#define OCEAN
 #define CALCULATE_PHASE_FUNCTION
+#define CALCULATE_MEDIUM_PROPERTIES_FILE
 
-const int angles = 3600;
+const int angles = 2;
 #if defined OCEAN && defined CALCULATE_PHASE_FUNCTION
 	const int wavelengths = 1;
 #else
-	const int wavelengths = 100;
+	const int wavelengths = 441;
 #endif
 const int threadCount = 10;
 
@@ -113,7 +114,7 @@ void CalculateMediumCoefficients(int s, glm::vec3 *xyzCoefficients, MediumPartic
 	}
 }
 
-void CalculatePhaseFunction(int s, float* phaseFunction, MediumParticles particle0, MediumParticles particle1, int particleTypes) {
+void CalculatePhaseFunction(int s, float* phaseFunction, float* asymmetry, float* energy, MediumParticles particle0, MediumParticles particle1, int particleTypes) {
 	for (int i = 0; i < wavelengths; ++i) {
 		double r = (double)i / wavelengths;
 		double lambda = (390.0 + (441.0 * r)) * 1e-9;
@@ -167,8 +168,87 @@ void CalculatePhaseFunction(int s, float* phaseFunction, MediumParticles particl
 				g = 1.0;
 			}
 
+			double e = 1.0;
+			for (int i = 0; i < 1024; ++i) {
+				double gFromE = 1.0 / e - 2.0 / log(2.0 * e + 1.0) + 1.0;
+				double deriv = 4.0 / ((2.0 * e + 1.0) * pow(log(2.0 * e + 1.0), 2.0)) - 1.0 / pow(e, 2.0);
+				if (abs(deriv) < 0.00000001) break;
+				e = e - (gFromE - g) / deriv;
+			}
+
+			asymmetry[i] = g;
+			energy[i] = e;
+
 			phaseFunction[n + i * angles] = phase;
 		}
+	}
+}
+
+void CalculateMediumProperties(int s, float* asymmetry, float* energy, float* scatteringCoefficient, float* absorptionCoefficient, float* extinctionCoefficient, float* scatteringAlbedo, MediumParticles particle0, MediumParticles particle1, int particleTypes) {
+	for (int i = 0; i < wavelengths; ++i) {
+		double r = (double)i / wavelengths;
+		double lambda = (390.0 + (441.0 * r)) * 1e-9;
+
+		#ifdef OCEAN
+				MediumParticles particles[2];
+				particles[0] = particle0;
+				particles[1] = particle1;
+				std::complex<double> hostIOR = BrineIOR(lambda * 1e9);
+				particles[0].ior = std::complex<double>(particles[0].ior.real(), InterpAlgaeK(lambda * 1e9));
+				particles[1].ior = std::complex<double>(particles[1].ior.real(), InterpMineralK(lambda * 1e9));
+		#else
+				MediumParticles particles = particle0;
+				std::complex<double> hostIOR = AirIOR(lambda * 1e9);
+				particles.ior = WaterIOR(lambda * 1e9);
+		#endif
+
+		double absorptionMedium = 4.0 * M_PI * imag(hostIOR) / lambda;
+
+		double scattering = 0.0;
+		double extinction = 0.0;
+		double absorption = 0.0;
+		double phase = 0.0;
+		double g = 0.0;
+		for (int m = 0; m < particleTypes; ++m) {
+			#ifdef OCEAN
+						MediumParticles particle = particles[m];
+			#else
+						MediumParticles particle = particles;
+			#endif
+			MediumProperties medium;
+			ComputeBulkMediumProperties(hostIOR, 0.0, lambda, particle, medium);
+
+			scattering += medium.scattering;
+			extinction += medium.extinction;
+
+			phase += medium.scattering * medium.phase.unpolarized;
+			g += medium.scattering * medium.phase.g;
+		}
+		extinction = absorptionMedium + extinction;
+		absorption = extinction - scattering;
+		phase = (1.0 / scattering) * phase;
+		g = (1.0 / scattering) * g;
+		if (std::isnan(g)) {
+			g = 0.0;
+		}
+		if (std::isinf(g)) {
+			g = 1.0;
+		}
+
+		double e = 1.0;
+		for (int i = 0; i < 1024; ++i) {
+			double gFromE = 1.0 / e - 2.0 / log(2.0 * e + 1.0) + 1.0;
+			double deriv = 4.0 / ((2.0 * e + 1.0) * pow(log(2.0 * e + 1.0), 2.0)) - 1.0 / pow(e, 2.0);
+			if (abs(deriv) < 0.00000001) break;
+			e = e - (gFromE - g) / deriv;
+		}
+
+		asymmetry[i] = g;
+		energy[i] = e;
+		scatteringCoefficient[i] = scattering;
+		absorptionCoefficient[i] = absorption;
+		extinctionCoefficient[i] = extinction;
+		scatteringAlbedo[i] = scattering / extinction;
 	}
 }
 
@@ -260,13 +340,13 @@ int main()
 	particles[0] = algae;
 	particles[1] = mineral;
 #else
-	const int aerosolType = 1;
+	const int aerosolType = 0;
 	double mean = 8.0e-7;
 	double standardDeviation = mean * 1.5;
 
 	const int particleTypes = 1;
-	double rMax_water = mean * 10.0 * 2.0;
-	double rMin_water = mean / 10.0;
+	double rMax_water = mean * 10.0;
+	double rMin_water = mean / 4.0;
 	double water_stepSize = rMin_water * 1.0;
 	switch (aerosolType) {
 		case 0: {
@@ -274,18 +354,26 @@ int main()
 		}
 		case 1: {
 			rMax_water = 4e-4;
-			rMin_water = 1e-4;
+			rMin_water = 1e-5;
 			water_stepSize = rMin_water * 1.0;
 			mean = rMax_water - rMin_water;
 			standardDeviation = mean * 20.0;
 			break;
 		}
 		case 2: {
-			rMax_water = 5e-8;
-			rMin_water = 5e-9;
+			rMax_water = 2e-5;
+			rMin_water = 1e-7;
 			water_stepSize = rMin_water * 1.0;
 			mean = rMax_water - rMin_water;
-			standardDeviation = mean * 20.0;
+			standardDeviation = mean * 10.0;
+			break;
+		}
+		case 3: {
+			rMax_water = 5e-8;
+			rMin_water = 2e-9;
+			water_stepSize = rMin_water * 1.0;
+			mean = rMax_water - rMin_water;
+			standardDeviation = mean * 1.0;
 			break;
 		}
 	}
@@ -299,18 +387,37 @@ int main()
 
 	double volume = 0.0;
 
-	std::cout << "Particle Count: " << ((rMax_water - rMin_water) / water_stepSize) + 1u << std::endl;
+	int count = static_cast<int>((rMax_water - rMin_water) / water_stepSize) + 1;
+
+	std::cout << "Particle Count: " << count << std::endl;
 
 	int counter = 0;
-	N_water.resize(static_cast<int>((rMax_water - rMin_water) / water_stepSize) + 1);
+	N_water.resize(count);
 	for (double r = rMin_water + water_stepSize * 0.5; r < rMax_water; r += water_stepSize) {
 		double x = r * 1e6;
 		double logNormal = (1.0 / (r * beta * sqrt(M_PI * 2.0))) * exp(-0.5 * pow((log(r) - alpha) / beta, 2.0));
 		double normal = (1.0 / (standardDeviation * sqrt(M_PI * 2.0))) * exp(-0.5 * pow((r - mean) / standardDeviation, 2.0));
-		double rainbow = pow(2.0 * x, -3.5);
+		double rainbow = pow(2.0 * r, -3.5);
 		double cumulus = 2.373 * pow(x, 6.0) * exp(-1.5 * x);
 		double haze = 5.33e4 * pow(x, 4.0) * exp(-8.9 * pow(x, 0.5));
-		N_water[counter] = cumulus;
+		switch (aerosolType) {
+			case 0: {
+				N_water[counter] = logNormal;
+				break;
+			}
+			case 1: {
+				N_water[counter] = rainbow;
+				break;
+			}
+			case 2: {
+				N_water[counter] = cumulus;
+				break;
+			}
+			case 3: {
+				N_water[counter] = haze;
+				break;
+			}
+		}
 		volume += pow(r, 3.0) * N_water[counter] * water_stepSize;
 		++counter;
 	}
@@ -337,8 +444,10 @@ int main()
 	};
 #endif
 
-#ifdef CALCULATE_PHASE_FUNCTION
+#if defined CALCULATE_PHASE_FUNCTION && !defined CALCULATE_MEDIUM_PROPERTIES_FILE
 		float phaseFunction[angles * wavelengths];
+		float g[wavelengths];
+		float e[wavelengths];
 
 	#ifdef OCEAN
 		MediumParticles particle0 = particles[0];
@@ -352,7 +461,7 @@ int main()
 		std::valarray<std::thread> th;
 		th.resize(threadCount);
 		for (int i = 0; i < threadCount; ++i) {
-			th[i] = std::thread(CalculatePhaseFunction, i, phaseFunction, particle0, particle1, particleTypes);
+			th[i] = std::thread(CalculatePhaseFunction, i, phaseFunction, g, e, particle0, particle1, particleTypes);
 		}
 
 		for (int i = 0; i < threadCount; ++i) {
@@ -399,6 +508,13 @@ int main()
 			}
 		}
 
+		float averageG = 0.0;
+		for (int i = 0; i < wavelengths; ++i) {
+			std::cout << i << ", " << g[i] << std::endl;
+			averageG += g[i] / wavelengths;
+		}
+		std::cout << " " << std::endl;
+
 		std::cout << time.count() << std::endl;
 
 		std::ofstream phaseLut("phase.dat", std::ios::binary);
@@ -419,41 +535,93 @@ int main()
 		#endif
 		auto start = std::chrono::high_resolution_clock::now();
 
-		glm::vec3 xyzCoefficients[7];
-		for (int i = 0; i < 7; ++i) {
-			xyzCoefficients[i] = glm::vec3(0.0f);
-		}
+		#ifdef CALCULATE_MEDIUM_PROPERTIES_FILE
+			std::ofstream mieOutput;
+			mieOutput.open("Outputs.txt");
 
-		std::valarray<std::thread> th;
-		th.resize(threadCount);
-		for (int i = 0; i < threadCount; ++i) {
-			th[i] = std::thread(CalculateMediumCoefficients, i, xyzCoefficients, particle0, particle1, particleTypes);
-		}
+			float g[wavelengths];
+			float e[wavelengths];
+			float scattering[wavelengths];
+			float absorption[wavelengths];
+			float extinction[wavelengths];
+			float albedo[wavelengths];
 
-		for (int i = 0; i < threadCount; ++i) {
-			th[i].join();
-		}
+			std::valarray<std::thread> th;
+			th.resize(threadCount);
+			for (int i = 0; i < threadCount; ++i) {
+				th[i] = std::thread(CalculateMediumProperties, i, g, e, scattering, absorption, extinction, albedo, particle0, particle1, particleTypes);
+			}
+
+			for (int i = 0; i < threadCount; ++i) {
+				th[i].join();
+			}
+
+			std::cout << "Wavelength" << " " << "Asymmetry Parameter" << " " << "Energy Parameter" << std::endl;
+			mieOutput << "Wavelength" << " " << "Asymmetry Parameter" << " " << "Energy Parameter" << std::endl;
+			for (int i = 0; i < wavelengths; ++i) {
+				double r = ((double)i + 1.0) / wavelengths;
+				double lambda = 390.0 + (441.0 * r);
+				std::cout << lambda << "nm, " << g[i] << ", " << e[i] << ", " << std::endl;
+				mieOutput << lambda << "nm, " << g[i] << ", " << e[i] << ", " << std::endl;
+			}
+
+			std::cout << " " << std::endl;
+			std::cout << " " << std::endl;
+			std::cout << " " << std::endl;
+			mieOutput << " " << std::endl;
+			mieOutput << " " << std::endl;
+			mieOutput << " " << std::endl;
+
+			std::cout << "Wavelength" << " " << "Scattering" << " " << "Absorption" << " " << "Extinction" << " " << "Scattering Albedo" << std::endl;
+			mieOutput << "Wavelength" << " " << "Scattering" << " " << "Absorption" << " " << "Extinction" << " " << "Scattering Albedo" << std::endl;
+			for (int i = 0; i < wavelengths; ++i) {
+				double r = ((double)i + 1.0) / wavelengths;
+				double lambda = 390.0 + (441.0 * r);
+				std::cout << lambda << "nm, " << scattering[i] << ", " << absorption[i] << ", " << extinction[i] << ", " << albedo[i] << std::endl;
+				mieOutput << lambda << "nm, " << scattering[i] << ", " << absorption[i] << ", " << extinction[i] << ", " << albedo[i] << std::endl;
+			}
 		
-		glm::vec3 D65 = xyzCoefficients[6] * xyzToRGBMatrix;
+			auto end = std::chrono::high_resolution_clock::now();
+			std::chrono::nanoseconds time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
 
-		glm::vec3 rgbScattering = glm::vec3(xyzCoefficients[0] * xyzToRGBMatrix) / D65;
-		glm::vec3 rgbExtinction = glm::vec3(xyzCoefficients[1] * xyzToRGBMatrix) / D65;
-		glm::vec3 rgbAbsorption = glm::vec3(xyzCoefficients[2] * xyzToRGBMatrix) / D65;
-		glm::vec3 rgbHostExtinction = glm::vec3(xyzCoefficients[3] * xyzToRGBMatrix) / D65;
-		glm::vec3 rgbParticlesExtinction = glm::vec3(xyzCoefficients[4] * xyzToRGBMatrix) / D65;
-		glm::vec3 rgbParticlesAbsorption = glm::vec3(xyzCoefficients[5] * xyzToRGBMatrix) / D65;
+			std::cout << time.count() << std::endl;
+		#else
+			glm::vec3 xyzCoefficients[7];
+			for (int i = 0; i < 7; ++i) {
+				xyzCoefficients[i] = glm::vec3(0.0f);
+			}
 
-		auto end = std::chrono::high_resolution_clock::now();
-		std::chrono::nanoseconds time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+			std::valarray<std::thread> th;
+			th.resize(threadCount);
+			for (int i = 0; i < threadCount; ++i) {
+				th[i] = std::thread(CalculateMediumCoefficients, i, xyzCoefficients, particle0, particle1, particleTypes);
+			}
 
-		std::cout << "scattering = " << "vec3(" << rgbScattering.r << ", " << rgbScattering.g << ", " << rgbScattering.b << ")," << std::endl;
-		std::cout << "absorption = " << "vec3(" << rgbAbsorption.r << ", " << rgbAbsorption.g << ", " << rgbAbsorption.b << ")," << std::endl;
-		std::cout << "extinction = " << "vec3(" << rgbExtinction.r << ", " << rgbExtinction.g << ", " << rgbExtinction.b << ")," << std::endl;
-		std::cout << " " << std::endl;
-		std::cout << "hostExtinction = " << "vec3(" << rgbHostExtinction.r << ", " << rgbHostExtinction.g << ", " << rgbHostExtinction.b << ")," << std::endl;
-		std::cout << "particleExtinction = " << "vec3(" << rgbParticlesExtinction.r << ", " << rgbParticlesExtinction.g << ", " << rgbParticlesExtinction.b << ")," << std::endl;
-		std::cout << "particleAbsorption = " << "vec3(" << rgbParticlesAbsorption.r << ", " << rgbParticlesAbsorption.g << ", " << rgbParticlesAbsorption.b << ")," << std::endl;
-		std::cout << std::endl;
-		std::cout << time.count() << std::endl;
+			for (int i = 0; i < threadCount; ++i) {
+				th[i].join();
+			}
+
+			glm::vec3 D65 = xyzCoefficients[6] * xyzToRGBMatrix;
+
+			glm::vec3 rgbScattering = glm::vec3(xyzCoefficients[0] * xyzToRGBMatrix) / D65;
+			glm::vec3 rgbExtinction = glm::vec3(xyzCoefficients[1] * xyzToRGBMatrix) / D65;
+			glm::vec3 rgbAbsorption = glm::vec3(xyzCoefficients[2] * xyzToRGBMatrix) / D65;
+			glm::vec3 rgbHostExtinction = glm::vec3(xyzCoefficients[3] * xyzToRGBMatrix) / D65;
+			glm::vec3 rgbParticlesExtinction = glm::vec3(xyzCoefficients[4] * xyzToRGBMatrix) / D65;
+			glm::vec3 rgbParticlesAbsorption = glm::vec3(xyzCoefficients[5] * xyzToRGBMatrix) / D65;
+
+			auto end = std::chrono::high_resolution_clock::now();
+			std::chrono::nanoseconds time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+
+			std::cout << "scattering = " << "vec3(" << rgbScattering.r << ", " << rgbScattering.g << ", " << rgbScattering.b << ")," << std::endl;
+			std::cout << "absorption = " << "vec3(" << rgbAbsorption.r << ", " << rgbAbsorption.g << ", " << rgbAbsorption.b << ")," << std::endl;
+			std::cout << "extinction = " << "vec3(" << rgbExtinction.r << ", " << rgbExtinction.g << ", " << rgbExtinction.b << ")," << std::endl;
+			std::cout << " " << std::endl;
+			std::cout << "hostExtinction = " << "vec3(" << rgbHostExtinction.r << ", " << rgbHostExtinction.g << ", " << rgbHostExtinction.b << ")," << std::endl;
+			std::cout << "particleExtinction = " << "vec3(" << rgbParticlesExtinction.r << ", " << rgbParticlesExtinction.g << ", " << rgbParticlesExtinction.b << ")," << std::endl;
+			std::cout << "particleAbsorption = " << "vec3(" << rgbParticlesAbsorption.r << ", " << rgbParticlesAbsorption.g << ", " << rgbParticlesAbsorption.b << ")," << std::endl;
+			std::cout << std::endl;
+			std::cout << time.count() << std::endl;
+		#endif
 	#endif
 }

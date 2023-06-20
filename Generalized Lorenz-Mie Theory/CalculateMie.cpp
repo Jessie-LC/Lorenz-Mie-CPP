@@ -46,7 +46,7 @@ void ComputeParticleProperties(std::complex<double> hostIOR, std::complex<double
 	std::complex<double> hostZ = x * hostIOR;
 	std::complex<double> particleZ = x * particleIOR;
 	double size = abs(hostZ);
-	unsigned int MAX_N = static_cast<unsigned int>(ceil(size + 4.3 * cbrt(size) + 1.0));
+	unsigned int MAX_N = static_cast<unsigned int>(ceil(size + 21.5 * cbrt(size) + 1.0));
 	
 	std::valarray<std::complex<double>> hostA;
 	std::valarray<std::complex<double>> particleA;
@@ -94,12 +94,12 @@ void ComputeParticleProperties(std::complex<double> hostIOR, std::complex<double
 	double g_sum = 0.0;
 	for (unsigned int n = 1u; n < MAX_N; ++n) {
 		LegendreDerivatives legendrePolynomial = LegendreAll(cosTheta, n);
-		double Pi = legendrePolynomial.derivative1;
-		double Tau = cosTheta * legendrePolynomial.derivative1 - sinThetaSq * legendrePolynomial.derivative2;
+		double AngularFunctionPi = legendrePolynomial.derivative1;
+		double AngularFunctionTau = cosTheta * legendrePolynomial.derivative1 - sinThetaSq * legendrePolynomial.derivative2;
 
 		double tmp = (2.0 * n + 1.0) / (n * (n + 1.0));
-		particle.S1 += tmp * (a[n] * Pi + b[n] * Tau);
-		particle.S2 += tmp * (a[n] * Tau + b[n] * Pi);
+		particle.S1 += tmp * (a[n] * AngularFunctionPi + b[n] * AngularFunctionTau);
+		particle.S2 += tmp * (a[n] * AngularFunctionTau + b[n] * AngularFunctionPi);
 
 		double a_n_abs_sq = compAbs(a[n])*compAbs(a[n]);
 		double b_n_abs_sq = compAbs(b[n])*compAbs(b[n]);
