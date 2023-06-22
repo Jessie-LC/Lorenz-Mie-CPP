@@ -46,7 +46,7 @@ void ComputeParticleProperties(std::complex<double> hostIOR, std::complex<double
 	std::complex<double> hostZ = x * hostIOR;
 	std::complex<double> particleZ = x * particleIOR;
 	double size = abs(hostZ);
-	unsigned int MAX_N = static_cast<unsigned int>(ceil(size + 21.5 * cbrt(size) + 1.0));
+	unsigned int MAX_N = static_cast<unsigned int>(ceil(size + 8.6 * cbrt(size) + 1.0));
 	
 	std::valarray<std::complex<double>> hostA;
 	std::valarray<std::complex<double>> particleA;

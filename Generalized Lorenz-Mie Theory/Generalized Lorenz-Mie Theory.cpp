@@ -8,15 +8,21 @@
 
 //#define OCEAN
 #define CALCULATE_PHASE_FUNCTION
-#define CALCULATE_MEDIUM_PROPERTIES_FILE
+//#define CALCULATE_MEDIUM_PROPERTIES_FILE
 
-const int angles = 2;
+const int angles = 3600;
 #if defined OCEAN && defined CALCULATE_PHASE_FUNCTION
 	const int wavelengths = 1;
 #else
-	const int wavelengths = 441;
+	const int wavelengths = 50;
 #endif
 const int threadCount = 10;
+
+const double wavelength[3] = {
+	650.0,
+	550.0,
+	450.0
+};
 
 glm::vec3 SpectrumToXYZ(float spectrum, float w) {
 	float n = w - 390.0f;
@@ -340,7 +346,8 @@ int main()
 	particles[0] = algae;
 	particles[1] = mineral;
 #else
-	const int aerosolType = 0;
+	const int aerosolType = 1;
+	const double R = 25.0;
 	double mean = 8.0e-7;
 	double standardDeviation = mean * 1.5;
 
@@ -354,8 +361,8 @@ int main()
 		}
 		case 1: {
 			rMax_water = 4e-4;
-			rMin_water = 1e-5;
-			water_stepSize = rMin_water * 1.0;
+			rMin_water = 1e-7;
+			water_stepSize = rMin_water * 200.0;
 			mean = rMax_water - rMin_water;
 			standardDeviation = mean * 20.0;
 			break;
@@ -395,9 +402,11 @@ int main()
 	N_water.resize(count);
 	for (double r = rMin_water + water_stepSize * 0.5; r < rMax_water; r += water_stepSize) {
 		double x = r * 1e6;
+		double D = x * 1e-3;
+		double lambda = 4.1 * R;
 		double logNormal = (1.0 / (r * beta * sqrt(M_PI * 2.0))) * exp(-0.5 * pow((log(r) - alpha) / beta, 2.0));
 		double normal = (1.0 / (standardDeviation * sqrt(M_PI * 2.0))) * exp(-0.5 * pow((r - mean) / standardDeviation, 2.0));
-		double rainbow = pow(2.0 * r, -3.5);
+		double rainbow = 8000.0 * exp(-lambda * D);
 		double cumulus = 2.373 * pow(x, 6.0) * exp(-1.5 * x);
 		double haze = 5.33e4 * pow(x, 4.0) * exp(-8.9 * pow(x, 0.5));
 		switch (aerosolType) {
@@ -422,8 +431,8 @@ int main()
 		++counter;
 	}
 
-	double waterWeight = 0.0005;
-	double waterDensity = 1000.0;
+	double waterWeight = 0.005; //grams
+	double waterDensity = 1000.0; //kg/m^3
 	double waterVolume = waterWeight < 1e-12 ? 0.0 : waterWeight / waterDensity;
 	double airVolume = 1.0 - waterVolume;
 
