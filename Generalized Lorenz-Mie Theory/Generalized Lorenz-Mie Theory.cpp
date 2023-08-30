@@ -6,17 +6,17 @@
 #include <glm.hpp>
 #include "Constants.h"
 
-//#define OCEAN
+#define OCEAN
 #define CALCULATE_PHASE_FUNCTION
 //#define CALCULATE_MEDIUM_PROPERTIES_FILE
 
-const int angles = 3600;
+const int angles = 1800;
 #if defined OCEAN && defined CALCULATE_PHASE_FUNCTION
 	const int wavelengths = 1;
 #else
 	const int wavelengths = 50;
 #endif
-const int threadCount = 10;
+const int threadCount = 5;
 
 const double wavelength[3] = {
 	650.0,
@@ -61,7 +61,7 @@ void CalculateMediumCoefficients(int s, glm::vec3 *xyzCoefficients, MediumPartic
 	glm::vec3 D65 = glm::vec3(0.0f);
 	for (int i = s; i < wavelengths; i += threadCount) {
 		double r = (double)i / wavelengths;
-		double lambda = (390.0 + (441.0 * r)) * 1e-9;
+		double lambda = wavelengths == 3 ? wavelength[i] : (390.0 + (441.0 * r)) * 1e-9;
 
 #ifdef OCEAN
 		MediumParticles particles[2];
@@ -123,7 +123,7 @@ void CalculateMediumCoefficients(int s, glm::vec3 *xyzCoefficients, MediumPartic
 void CalculatePhaseFunction(int s, float* phaseFunction, float* asymmetry, float* energy, MediumParticles particle0, MediumParticles particle1, int particleTypes) {
 	for (int i = 0; i < wavelengths; ++i) {
 		double r = (double)i / wavelengths;
-		double lambda = (390.0 + (441.0 * r)) * 1e-9;
+		double lambda = wavelengths == 3 ? wavelength[i] : (390.0 + (441.0 * r)) * 1e-9;
 		for (int n = s; n < angles; n += threadCount) {
 			double dtheta{ M_PI / (angles - 1) };
 			double theta = n * dtheta;
@@ -264,13 +264,13 @@ int main()
 	const int particleTypes = 2;
 	double rMax_mineral = 100e-6;
 	double rMin_mineral = 0.01e-6;
-	double mineral_stepSize = rMin_mineral * 1.0;
+	double mineral_stepSize = rMin_mineral;
 
 	double rMax_algae = 100e-6;
 	double rMin_algae = 0.2e-6;
 	double algae_stepSize = rMin_algae;
 
-	const int waterBody = 4;
+	const int waterBody = 3;
 	double vAlgae = 2.171e-6;
 	double vMineral = 2.077e-6;
 	switch (waterBody) {
