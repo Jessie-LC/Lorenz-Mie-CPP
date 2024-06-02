@@ -35,10 +35,52 @@ LegendreDerivatives LegendreAll(double x, int n) {
 	}
 }
 
-double compAbs(std::complex<double> z) {
+double CompAbs(std::complex<double> z) {
 	return sqrt(z.real() * z.real() + z.imag() * z.imag());
 }
 
+std::complex<double> computeA(int inputN, int M, std::complex<double> z) {
+    std::complex<double> a1;
+    std::complex<double> a0 = std::complex<double>(1.0, 0.0);
+
+    for (int n = M; n >= inputN; --n) {
+        a1 = a0;
+        std::complex<double> tmp = std::complex<double>(n + 1.0, 0.0) / z;
+        a0 = tmp - (std::complex<double>(1.0, 0.0) / (tmp + a1));
+    }
+
+    return a0;
+}
+
+struct LorenzCoefficients {
+	std::complex<double> a;
+	std::complex<double> b;
+};
+LorenzCoefficients ComputeAB(int inputN, int M, std::complex<double> hostIOR, std::complex<double> particleIOR, std::complex<double> hostZ, std::complex<double> particleZ) {
+    std::complex<double> B       = std::complex<double>(0.0, 1.0);
+    std::complex<double> psiZeta = std::complex<double>(0.5, 0.0) * (1.0 - exp(std::complex<double>(-2.0 * hostZ.imag(),  2.0 * hostZ.real())));
+    std::complex<double> ratio   = std::complex<double>(0.5, 0.0) * (1.0 - exp(std::complex<double>( 2.0 * hostZ.imag(), -2.0 * hostZ.real())));
+
+    for (int n = 1; true; ++n) {
+        std::complex<double> hostAN     = computeA(n, M, hostZ);
+        std::complex<double> particleAN = computeA(n, M, particleZ);
+
+        std::complex<double> n_z = std::complex<double>(n, 0.0) / hostZ;
+        psiZeta *= (n_z - computeA(n - 1, M, hostZ)) * (n_z - B);
+        B = hostAN + (std::complex<double>(0.0, 1.0) / psiZeta);
+        ratio *= (B + n_z) / (hostAN + n_z);
+
+        if (n == inputN) {
+            std::complex<double> a = ratio * ((hostIOR * particleAN - particleIOR * hostAN) / (hostIOR * particleAN - particleIOR * B));
+            std::complex<double> b = ratio * ((particleIOR * particleAN - hostIOR * hostAN) / (particleIOR * particleAN - hostIOR * B));
+            return LorenzCoefficients{ a, b };
+        }
+    }
+}
+
+#define USE_ARRAYS
+
+#ifdef USE_ARRAYS
 void ComputeParticleProperties(std::complex<double> hostIOR, std::complex<double> particleIOR, double theta, double radius, double lambda, ParticlePhase& phase, ParticleProperties& particle) {
 	double x = 2.0 * M_PI * radius / lambda;
 	std::complex<double> k = 2.0 * M_PI * hostIOR / lambda;
@@ -101,8 +143,8 @@ void ComputeParticleProperties(std::complex<double> hostIOR, std::complex<double
 		particle.S1 += tmp * (a[n] * AngularFunctionPi + b[n] * AngularFunctionTau);
 		particle.S2 += tmp * (a[n] * AngularFunctionTau + b[n] * AngularFunctionPi);
 
-		double a_n_abs_sq = compAbs(a[n])*compAbs(a[n]);
-		double b_n_abs_sq = compAbs(b[n])*compAbs(b[n]);
+		double a_n_abs_sq = CompAbs(a[n])*CompAbs(a[n]);
+		double b_n_abs_sq = CompAbs(b[n])*CompAbs(b[n]);
 		particle.scattering += (2.0 * n + 1.0) * (a_n_abs_sq + b_n_abs_sq);
 		ext += (2.0 * n + 1.0) * (a[n] + b[n]) * invKK;
 		extSum += (2.0 * n + 1.0) * real((a[n] + b[n]) / hostIOR);
@@ -113,14 +155,14 @@ void ComputeParticleProperties(std::complex<double> hostIOR, std::complex<double
 	double alpha = 4.0 * M_PI * radius * imag(hostIOR) / lambda;
 	double gamma = alpha < 1e-6 ? 1.0 : (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
 
-	particle.scattering *= pow(lambda, 2.0) * exp(-4.0 * M_PI * radius * hostIOR.imag() / lambda) / (2.0 * M_PI * gamma * pow(compAbs(hostIOR), 2.0));
-	particle.scattering /= compAbs(hostIOR);
+	particle.scattering *= pow(lambda, 2.0) * exp(-4.0 * M_PI * radius * hostIOR.imag() / lambda) / (2.0 * M_PI * gamma * pow(CompAbs(hostIOR), 2.0));
+	particle.scattering /= CompAbs(hostIOR);
 	particle.extinction = pow(lambda, 2.0) / (2.0 * M_PI) * extSum;
 	particle.absorption = particle.extinction - particle.scattering;
 
-	phase.unpolarized = (pow(compAbs(particle.S1), 2.0) + pow(compAbs(particle.S2), 2.0)) / (2.0 * pow(compAbs(k), 2.0) * particle.scattering);
-	phase.s_polarized = pow(compAbs(particle.S1), 2.0) / (pow(compAbs(k), 2.0) * particle.scattering);
-	phase.p_polarized = pow(compAbs(particle.S2), 2.0) / (pow(compAbs(k), 2.0) * particle.scattering);
+	phase.unpolarized = (pow(CompAbs(particle.S1), 2.0) + pow(CompAbs(particle.S2), 2.0)) / (2.0 * pow(CompAbs(k), 2.0) * particle.scattering);
+	phase.s_polarized = pow(CompAbs(particle.S1), 2.0) / (pow(CompAbs(k), 2.0) * particle.scattering);
+	phase.p_polarized = pow(CompAbs(particle.S2), 2.0) / (pow(CompAbs(k), 2.0) * particle.scattering);
 
 	if (std::isnan(phase.unpolarized)) {
 		phase.unpolarized = 0.0;
@@ -142,6 +184,82 @@ void ComputeParticleProperties(std::complex<double> hostIOR, std::complex<double
 		phase.g = 1.0;
 	}
 }
+#else
+void ComputeParticleProperties(std::complex<double> hostIOR, std::complex<double> particleIOR, double theta, double radius, double lambda, ParticlePhase& phase, ParticleProperties& particle) {
+	double x = 2.0 * M_PI * radius / lambda;
+	std::complex<double> k = 2.0 * M_PI * hostIOR / lambda;
+
+	std::complex<double> hostZ = x * hostIOR;
+	std::complex<double> particleZ = x * particleIOR;
+	double size = abs(hostZ);
+	unsigned int MAX_N = static_cast<unsigned int>(ceil(size + 8.6 * cbrt(size) + 1.0));
+
+	double cosTheta = cos(theta);
+	double sinTheta = sin(theta);
+
+	double sinThetaSq = sinTheta*sinTheta;
+	std::complex<double> invKK = 1.0 / (k * k);
+
+	particle.S1 = std::complex<double>(0.0);
+	particle.S2 = std::complex<double>(0.0);
+	particle.scattering = 0.0;
+	std::complex<double> ext = std::complex < double>(0.0);
+	double extSum = 0.0;
+	double sum = 0.0;
+	double g_sum = 0.0;
+	for (unsigned int n = 1u; n < MAX_N; ++n) {
+		LorenzCoefficients coeffs_n = ComputeAB((int)n, (int)MAX_N, hostIOR, particleIOR, hostZ, particleZ);
+		LorenzCoefficients coeffs_n_1 = ComputeAB((int)n + 1, (int)MAX_N, hostIOR, particleIOR, hostZ, particleZ);
+		LegendreDerivatives legendrePolynomial = LegendreAll(cosTheta, n);
+		double AngularFunctionPi = legendrePolynomial.derivative1;
+		double AngularFunctionTau = cosTheta * legendrePolynomial.derivative1 - sinThetaSq * legendrePolynomial.derivative2;
+
+		double tmp = (2.0 * n + 1.0) / (n * (n + 1.0));
+		particle.S1 += tmp * (coeffs_n.a * AngularFunctionPi + coeffs_n.b * AngularFunctionTau);
+		particle.S2 += tmp * (coeffs_n.a * AngularFunctionTau + coeffs_n.b * AngularFunctionPi);
+
+		double a_n_abs_sq = CompAbs(coeffs_n.a)*CompAbs(coeffs_n.a);
+		double b_n_abs_sq = CompAbs(coeffs_n.b)*CompAbs(coeffs_n.b);
+		particle.scattering += (2.0 * n + 1.0) * (a_n_abs_sq + b_n_abs_sq);
+		ext += (2.0 * n + 1.0) * (coeffs_n.a + coeffs_n.b) * invKK;
+		extSum += (2.0 * n + 1.0) * real((coeffs_n.a + coeffs_n.b) / hostIOR);
+		sum += (2.0 * n + 1.0) * (a_n_abs_sq + b_n_abs_sq);
+
+		g_sum += ((n * (n + 2)) / (n + 1)) * real(coeffs_n.a * conj(coeffs_n_1.a) + coeffs_n.b * conj(coeffs_n_1.b)) + tmp * real(coeffs_n.a * conj(coeffs_n.b));
+	}
+	double alpha = 4.0 * M_PI * radius * imag(hostIOR) / lambda;
+	double gamma = alpha < 1e-6 ? 1.0 : (2.0 * (1.0 + (alpha - 1.0) * exp(alpha))) / pow(alpha, 2.0);
+
+	particle.scattering *= pow(lambda, 2.0) * exp(-4.0 * M_PI * radius * hostIOR.imag() / lambda) / (2.0 * M_PI * gamma * pow(CompAbs(hostIOR), 2.0));
+	particle.scattering /= CompAbs(hostIOR);
+	particle.extinction = pow(lambda, 2.0) / (2.0 * M_PI) * extSum;
+	particle.absorption = particle.extinction - particle.scattering;
+
+	phase.unpolarized = (pow(CompAbs(particle.S1), 2.0) + pow(CompAbs(particle.S2), 2.0)) / (2.0 * pow(CompAbs(k), 2.0) * particle.scattering);
+	phase.s_polarized = pow(CompAbs(particle.S1), 2.0) / (pow(CompAbs(k), 2.0) * particle.scattering);
+	phase.p_polarized = pow(CompAbs(particle.S2), 2.0) / (pow(CompAbs(k), 2.0) * particle.scattering);
+
+	if (std::isnan(phase.unpolarized)) {
+		phase.unpolarized = 0.0;
+		phase.s_polarized = 0.0;
+		phase.p_polarized = 0.0;
+	}
+	if (std::isnan(particle.scattering)) {
+		particle.scattering = 0.0;
+	}
+	if (std::isnan(particle.extinction)) {
+		particle.extinction = 0.0;
+	}
+
+	phase.g = g_sum / (0.5 * sum);
+	if (std::isnan(phase.g)) {
+		phase.g = 0.0;
+	}
+	if (std::isinf(phase.g)) {
+		phase.g = 1.0;
+	}
+}
+#endif
 
 void ComputeBulkMediumProperties(std::complex<double> hostIOR, double theta, double lambda, MediumParticles mParticle, MediumProperties& medium) {
 	/*

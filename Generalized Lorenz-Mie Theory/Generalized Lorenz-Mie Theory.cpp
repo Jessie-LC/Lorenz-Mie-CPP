@@ -6,22 +6,23 @@
 #include <glm.hpp>
 #include "Constants.h"
 
-#define OCEAN
+//#define OCEAN
 #define CALCULATE_PHASE_FUNCTION
+#define SINGLE_PARTICLE
 //#define CALCULATE_MEDIUM_PROPERTIES_FILE
 
-const int angles = 1800;
+const int angles = 3600;
 #if defined OCEAN && defined CALCULATE_PHASE_FUNCTION
 	const int wavelengths = 1;
 #else
-	const int wavelengths = 50;
+	const int wavelengths = 200;
 #endif
-const int threadCount = 5;
+const int threadCount = 12;
 
 const double wavelength[3] = {
-	650.0,
+	450.0,
 	550.0,
-	450.0
+	650.0
 };
 
 glm::vec3 SpectrumToXYZ(float spectrum, float w) {
@@ -136,9 +137,12 @@ void CalculatePhaseFunction(int s, float* phaseFunction, float* asymmetry, float
 			particles[0].ior = std::complex<double>(particles[0].ior.real(), InterpAlgaeK(lambda * 1e9));
 			particles[1].ior = std::complex<double>(particles[1].ior.real(), InterpMineralK(lambda * 1e9));
 	#else
-			MediumParticles particles = particle0;
+			MediumParticles particles[2];
+			particles[0] = particle0;
+			particles[1] = particle1;
 			std::complex<double> hostIOR = AirIOR(lambda * 1e9);
-			particles.ior = WaterIOR(lambda * 1e9);
+			particles[0].ior = IceIOR(lambda * 1e9);
+			particles[1].ior = IceIOR(lambda * 1e9);//Silica(lambda * 1e9);
 	#endif
 
 			double absorptionMedium = 4.0 * M_PI * imag(hostIOR) / lambda;
@@ -149,19 +153,31 @@ void CalculatePhaseFunction(int s, float* phaseFunction, float* asymmetry, float
 			double phase = 0.0;
 			double g = 0.0;
 			for (int m = 0; m < particleTypes; ++m) {
-	#ifdef OCEAN
-				MediumParticles particle = particles[m];
-	#else
-				MediumParticles particle = particles;
-	#endif
-				MediumProperties medium;
-				ComputeBulkMediumProperties(hostIOR, theta, lambda, particle, medium);
+				#ifdef OCEAN
+					MediumParticles particle = particles[m];
+				#else
+					MediumParticles particle = particles[m];
+				#endif
+				#ifndef SINGLE_PARTICLE
+					MediumProperties medium;
+					ComputeBulkMediumProperties(hostIOR, theta, lambda, particle, medium);
 
-				scattering += medium.scattering;
-				extinction += medium.extinction;
+					scattering += medium.scattering;
+					extinction += medium.extinction;
 
-				phase += medium.scattering * medium.phase.unpolarized;
-				g += medium.scattering * medium.phase.g;
+					phase += medium.scattering * medium.phase.unpolarized;
+					g += medium.scattering * medium.phase.g;
+				#else
+					ParticleProperties particleProp;
+					ParticlePhase phaseFunc;
+					ComputeParticleProperties(hostIOR, particle.ior, theta, 100e-6, lambda, phaseFunc, particleProp);
+
+					scattering += particleProp.scattering;
+					extinction += particleProp.extinction;
+
+					phase += particleProp.scattering * phaseFunc.unpolarized;
+					g += particleProp.scattering * phaseFunc.g;
+				#endif
 			}
 			extinction = absorptionMedium + extinction;
 			absorption = extinction - scattering;
@@ -203,9 +219,12 @@ void CalculateMediumProperties(int s, float* asymmetry, float* energy, float* sc
 				particles[0].ior = std::complex<double>(particles[0].ior.real(), InterpAlgaeK(lambda * 1e9));
 				particles[1].ior = std::complex<double>(particles[1].ior.real(), InterpMineralK(lambda * 1e9));
 		#else
-				MediumParticles particles = particle0;
-				std::complex<double> hostIOR = AirIOR(lambda * 1e9);
-				particles.ior = WaterIOR(lambda * 1e9);
+			MediumParticles particles[2];
+			particles[0] = particle0;
+			particles[1] = particle1;
+			std::complex<double> hostIOR = AirIOR(lambda * 1e9);
+			particles[0].ior = WaterIOR(lambda * 1e9);
+			particles[1].ior = std::complex<double>(1.95, 0.79);//Silica(lambda * 1e9);
 		#endif
 
 		double absorptionMedium = 4.0 * M_PI * imag(hostIOR) / lambda;
@@ -219,7 +238,7 @@ void CalculateMediumProperties(int s, float* asymmetry, float* energy, float* sc
 			#ifdef OCEAN
 						MediumParticles particle = particles[m];
 			#else
-						MediumParticles particle = particles;
+						MediumParticles particle = particles[m];
 			#endif
 			MediumProperties medium;
 			ComputeBulkMediumProperties(hostIOR, 0.0, lambda, particle, medium);
@@ -258,6 +277,180 @@ void CalculateMediumProperties(int s, float* asymmetry, float* energy, float* sc
 	}
 }
 
+double LogNormalDistribution(double r, double mean, double standardDeviation) {
+	double beta_sqr = log(((standardDeviation * standardDeviation) / (mean * mean)) + 1.0);
+	double alpha = log(mean) - 0.5 * beta_sqr;
+	double a = 4.9757e6;
+	double beta = sqrt(beta_sqr);
+	return (1.0 / (r * beta * sqrt(M_PI * 2.0))) * exp(-0.5 * pow((log(r) - alpha) / beta, 2.0));
+}
+double NormalDistribution(double r, double mean, double standardDeviation) {
+	return (1.0 / (standardDeviation * sqrt(M_PI * 2.0))) * exp(-0.5 * pow((r - mean) / standardDeviation, 2.0));
+}
+
+/*
+0 - North Sea
+1 - Mediterranean
+2 - Channel
+3 - Baltic
+4 - Atlantic
+*/
+//*
+int main() {
+	const float rMax_cloud = 100e-9;
+	const float rMin_cloud = 20e-9;
+	const float cloud_stepSize = 2e-9;
+	const float mean = 60e-9;
+	const float standardDeviation = 50e-9;
+
+	float phaseFunction[angles * wavelengths];
+	float asymmetry[wavelengths];
+	float energy[wavelengths];
+	float extinctionCoeff[wavelengths];
+	float albedo[wavelengths];
+
+	std::valarray<double> N_cloud;
+
+	double volume = 0.0;
+
+	int count = static_cast<int>((rMax_cloud - rMin_cloud) / cloud_stepSize) + 1;
+
+	std::cout << "Particle Count: " << count << std::endl;
+
+	int counter = 0;
+	N_cloud.resize(count);
+	for (double r = rMin_cloud + cloud_stepSize * 0.5; r < rMax_cloud; r += cloud_stepSize) {
+		double logNormal = LogNormalDistribution(r, mean, standardDeviation);
+
+		N_cloud[counter] = logNormal;
+		volume += pow(r, 3.0) * N_cloud[counter] * cloud_stepSize;
+		++counter;
+	}
+
+	double waterWeight = 0.00001; //grams
+	double waterDensity = 1000.0; //kg/m^3
+	double waterVolume = waterWeight < 1e-12 ? 0.0 : waterWeight / waterDensity;
+	double airVolume = 1.0 - waterVolume;
+
+	double N = ((waterWeight > 1e-12 ? waterVolume : 1.0) / airVolume) / (4.1887902 * volume);
+
+	counter = 0;
+	for (double r = rMin_cloud + cloud_stepSize * 0.5; r < rMax_cloud; r += cloud_stepSize) {
+		N_cloud[counter] = N * N_cloud[counter];
+		++counter;
+	}
+
+	MediumParticles cloud{
+		VacuumIOR,
+		rMin_cloud,
+		rMax_cloud,
+		cloud_stepSize,
+		N_cloud
+	};
+
+	for (int i = 0; i < wavelengths; ++i) {
+		double r = (double)i / wavelengths;
+		double lambda = (390.0 + (441.0 * r)) * 1e-9;
+		for (int n = 0; n < angles; ++n) {
+			double dtheta{ M_PI / (angles - 1) };
+			double theta = n * dtheta;
+
+			std::complex<double> hostIOR = AirIOR(lambda * 1e9);
+			std::complex<double> particleIOR = IceIOR(lambda * 1e9);
+			cloud.ior = particleIOR;
+
+			double absorptionMedium = 4.0 * M_PI * imag(hostIOR) / lambda;
+
+			double scattering = 0.0;
+			double extinction = 0.0;
+			double absorption = 0.0;
+			double phase = 0.0;
+			double g = 0.0;
+
+			MediumProperties medium;
+			ComputeBulkMediumProperties(hostIOR, theta, lambda, cloud, medium);
+
+			scattering = medium.scattering;
+			extinction = medium.extinction;
+
+			phase = medium.scattering * medium.phase.unpolarized;
+			g = medium.scattering * medium.phase.g;
+
+			extinction = absorptionMedium + extinction;
+			absorption = extinction - scattering;
+			phase = (1.0 / scattering) * phase;
+			g = (1.0 / scattering) * g;
+			if (std::isnan(g)) {
+				g = 0.0;
+			}
+			if (std::isinf(g)) {
+				g = 1.0;
+			}
+
+			double e = 1.0;
+			for (int i = 0; i < 1024; ++i) {
+				double gFromE = 1.0 / e - 2.0 / log(2.0 * e + 1.0) + 1.0;
+				double deriv = 4.0 / ((2.0 * e + 1.0) * pow(log(2.0 * e + 1.0), 2.0)) - 1.0 / pow(e, 2.0);
+				if (abs(deriv) < 0.00000001) break;
+				e = e - (gFromE - g) / deriv;
+			}
+
+			asymmetry[i] = g;
+			energy[i] = e;
+			extinctionCoeff[i] = extinction;
+			albedo[i] = scattering / extinction;
+
+			phaseFunction[n + i * angles] = phase;
+		}
+	}
+
+	std::valarray<double> anglesRadians;
+	anglesRadians.resize(angles);
+	for (int n = 0; n < angles; ++n) {
+		double dtheta{ M_PI / (angles - 1) };
+		double theta = n * dtheta;
+
+		anglesRadians[n] = theta;
+	}
+
+	float CDF[angles * wavelengths];
+	for (int i = 0; i < wavelengths; ++i) {
+		CDF[0 + i * angles] = 0.0f;
+		for (int n = 1; n < angles; ++n) {
+			float angleStart = anglesRadians[n - 1];
+			float angleEnd = anglesRadians[n];
+			float phaseStart = phaseFunction[(n - 1) + i * angles];
+			float phaseEnd = phaseFunction[n + i * angles];
+
+			float p1 = phaseStart * (cos(angleStart) - cos(angleEnd));
+			float p2 = (phaseEnd - phaseStart) / (angleEnd - angleStart);
+			float p3 = (sin(angleEnd) - angleEnd * cos(angleEnd)) - (sin(angleStart) - angleStart * cos(angleStart));
+			float p4 = angleStart * (cos(angleStart) - cos(angleEnd));
+
+			float integral = (float)2.0f * (float)M_PI * (p1 + p2 * (p3 - p4));
+			CDF[n + i * angles] = CDF[(n - 1) + i * angles] + integral;
+		}
+	}
+
+	for (int i = 0; i < wavelengths; ++i) {
+		float maxCDF = CDF[(angles - 1) + i * angles];
+
+		for (int n = 0; n < angles; ++n) {
+			phaseFunction[n + i * angles] /= maxCDF;
+			CDF[n + i * angles] /= maxCDF;
+		}
+	}
+
+	std::ofstream phaseLut("phaseNoctilucent.dat", std::ios::binary);
+	phaseLut.write(reinterpret_cast<char*>(phaseFunction), sizeof(float) * angles * wavelengths);
+	phaseLut.close();
+	std::cout << "Finished writing phase!" << std::endl;
+	std::ofstream cdfLut("cdfNoctilucent.dat", std::ios::binary);
+	cdfLut.write(reinterpret_cast<char*>(CDF), sizeof(float) * angles * wavelengths);
+	cdfLut.close();
+	std::cout << "Finished writing CDF!" << std::endl;
+}
+/*/
 int main()
 {
 #ifdef OCEAN
@@ -270,33 +463,33 @@ int main()
 	double rMin_algae = 0.2e-6;
 	double algae_stepSize = rMin_algae;
 
-	const int waterBody = 3;
+	const int waterBody = 1;
 	double vAlgae = 2.171e-6;
 	double vMineral = 2.077e-6;
 	switch (waterBody) {
-	case 0: {
-		break;
-	}
-	case 1: {
-		vAlgae = 3.878e-7;
-		vMineral = 3.075e-7;
-		break;
-	}
-	case 2: {
-		vAlgae = 4.999e-7;
-		vMineral = 2.300e-7;
-		break;
-	}
-	case 3: {
-		vAlgae = 1.904e-6;
-		vMineral = 5.429e-7;
-		break;
-	}
-	case 4: {
-		vAlgae = 1.880e-7;
-		vMineral = 2.477e-10;
-		break;
-	}
+		case 0: {
+			break;
+		}
+		case 1: {
+			vAlgae = 3.878e-8;
+			vMineral = 3.075e-7;
+			break;
+		}
+		case 2: {
+			vAlgae = 4.999e-7;
+			vMineral = 2.300e-7;
+			break;
+		}
+		case 3: {
+			vAlgae = 1.904e-6;
+			vMineral = 5.429e-7;
+			break;
+		}
+		case 4: {
+			vAlgae = 1.880e-7;
+			vMineral = 2.477e-10;
+			break;
+		}
 	}
 
 	std::cout << "Mineral Particle Count: " << ((rMax_mineral - rMin_mineral) / mineral_stepSize) + 1u << std::endl;
@@ -346,15 +539,19 @@ int main()
 	particles[0] = algae;
 	particles[1] = mineral;
 #else
-	const int aerosolType = 1;
+	const int aerosolType = 0;
 	const double R = 25.0;
 	double mean = 8.0e-7;
 	double standardDeviation = mean * 1.5;
 
-	const int particleTypes = 1;
+	const int particleTypes = 2;
 	double rMax_water = mean * 10.0;
 	double rMin_water = mean / 4.0;
 	double water_stepSize = rMin_water * 1.0;
+	double rMax_mineral = 1e-4;
+	double rMin_mineral = 1e-5;
+	double mineral_stepSize = rMin_mineral * 2.0;
+
 	switch (aerosolType) {
 		case 0: {
 			break;
@@ -368,7 +565,7 @@ int main()
 			break;
 		}
 		case 2: {
-			rMax_water = 2e-5;
+			rMax_water = 1e-5;
 			rMin_water = 1e-7;
 			water_stepSize = rMin_water * 1.0;
 			mean = rMax_water - rMin_water;
@@ -376,8 +573,8 @@ int main()
 			break;
 		}
 		case 3: {
-			rMax_water = 5e-8;
-			rMin_water = 2e-9;
+			rMax_water = 8e-8;
+			rMin_water = 1e-9;
 			water_stepSize = rMin_water * 1.0;
 			mean = rMax_water - rMin_water;
 			standardDeviation = mean * 1.0;
@@ -386,11 +583,7 @@ int main()
 	}
 
 	std::valarray<double> N_water;
-
-	double beta_sqr = log(((standardDeviation * standardDeviation) / (mean * mean)) + 1.0);
-	double alpha = log(mean) - 0.5 * beta_sqr;
-	double a = 4.9757e6;
-	double beta = sqrt(beta_sqr);
+	std::valarray<double> N_mineral;
 
 	double volume = 0.0;
 
@@ -404,8 +597,8 @@ int main()
 		double x = r * 1e6;
 		double D = x * 1e-3;
 		double lambda = 4.1 * R;
-		double logNormal = (1.0 / (r * beta * sqrt(M_PI * 2.0))) * exp(-0.5 * pow((log(r) - alpha) / beta, 2.0));
-		double normal = (1.0 / (standardDeviation * sqrt(M_PI * 2.0))) * exp(-0.5 * pow((r - mean) / standardDeviation, 2.0));
+		double logNormal = LogNormalDistribution(r, mean, standardDeviation);
+		double normal = NormalDistribution(r, mean, standardDeviation);
 		double rainbow = 8000.0 * exp(-lambda * D);
 		double cumulus = 2.373 * pow(x, 6.0) * exp(-1.5 * x);
 		double haze = 5.33e4 * pow(x, 4.0) * exp(-8.9 * pow(x, 0.5));
@@ -431,7 +624,7 @@ int main()
 		++counter;
 	}
 
-	double waterWeight = 0.005; //grams
+	double waterWeight = 0.00005; //grams
 	double waterDensity = 1000.0; //kg/m^3
 	double waterVolume = waterWeight < 1e-12 ? 0.0 : waterWeight / waterDensity;
 	double airVolume = 1.0 - waterVolume;
@@ -444,13 +637,38 @@ int main()
 		++counter;
 	}
 
-	MediumParticles particles{
+	count = static_cast<int>((rMax_mineral - rMin_mineral) / mineral_stepSize) + 1;
+
+	std::cout << "Particle Count: " << count << std::endl;
+
+	counter = 0;
+	N_mineral.resize(count);
+	volume = 0.0;
+	for (double r = rMin_mineral + mineral_stepSize * 0.5; r < rMax_mineral; r += mineral_stepSize) {
+		N_mineral[counter] = NormalDistribution(r, 5e-5, 5e-5) * 6e5;
+		volume += pow(r, 3.0) * N_mineral[counter] * water_stepSize;
+		++counter;
+	}
+
+	MediumParticles mineral{
+		std::complex<double>{ 0.0, 0.0 },
+		rMin_mineral,
+		rMax_mineral,
+		mineral_stepSize,
+		N_mineral
+	};
+
+	MediumParticles water{
 		std::complex<double>{ 0.0, 0.0 },
 		rMin_water,
 		rMax_water,
 		water_stepSize,
 		N_water
 	};
+
+	MediumParticles particles[2];
+	particles[0] = water;
+	particles[1] = mineral;
 #endif
 
 #if defined CALCULATE_PHASE_FUNCTION && !defined CALCULATE_MEDIUM_PROPERTIES_FILE
@@ -462,8 +680,8 @@ int main()
 		MediumParticles particle0 = particles[0];
 		MediumParticles particle1 = particles[1];
 	#else
-		MediumParticles particle0 = particles;
-		MediumParticles particle1 = particles;
+		MediumParticles particle0 = particles[0];
+		MediumParticles particle1 = particles[1];
 	#endif
 		auto start = std::chrono::high_resolution_clock::now();
 
@@ -539,8 +757,8 @@ int main()
 			MediumParticles particle0 = particles[0];
 			MediumParticles particle1 = particles[1];
 		#else
-			MediumParticles particle0 = particles;
-			MediumParticles particle1 = particles;
+			MediumParticles particle0 = particles[0];
+			MediumParticles particle1 = particles[1];
 		#endif
 		auto start = std::chrono::high_resolution_clock::now();
 
@@ -569,7 +787,7 @@ int main()
 			mieOutput << "Wavelength" << " " << "Asymmetry Parameter" << " " << "Energy Parameter" << std::endl;
 			for (int i = 0; i < wavelengths; ++i) {
 				double r = ((double)i + 1.0) / wavelengths;
-				double lambda = 390.0 + (441.0 * r);
+				double lambda = wavelengths == 3 ? wavelength[i] : 390.0 + (441.0 * r);
 				std::cout << lambda << "nm, " << g[i] << ", " << e[i] << ", " << std::endl;
 				mieOutput << lambda << "nm, " << g[i] << ", " << e[i] << ", " << std::endl;
 			}
@@ -585,7 +803,7 @@ int main()
 			mieOutput << "Wavelength" << " " << "Scattering" << " " << "Absorption" << " " << "Extinction" << " " << "Scattering Albedo" << std::endl;
 			for (int i = 0; i < wavelengths; ++i) {
 				double r = ((double)i + 1.0) / wavelengths;
-				double lambda = 390.0 + (441.0 * r);
+				double lambda = wavelengths == 3 ? wavelength[i] : 390.0 + (441.0 * r);
 				std::cout << lambda << "nm, " << scattering[i] << ", " << absorption[i] << ", " << extinction[i] << ", " << albedo[i] << std::endl;
 				mieOutput << lambda << "nm, " << scattering[i] << ", " << absorption[i] << ", " << extinction[i] << ", " << albedo[i] << std::endl;
 			}
@@ -634,3 +852,4 @@ int main()
 		#endif
 	#endif
 }
+//*/

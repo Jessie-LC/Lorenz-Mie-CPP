@@ -18,6 +18,10 @@ int BinarySearch(int lowIndex, int highIndex, double toFind, const double arr[])
 	return -1;
 }
 
+std::complex<double> IceIOR(double wavelength) {
+	return std::complex<double>(sqrt(1 + 0.496 / (1 - pow(0.071 / wavelength, 2)) + 0.190 / (1 - pow(0.134 / wavelength, 2))), 0.0);
+}
+
 std::complex<double> BrineIOR(double wavelength) {
 	double lambdaMin = wavelength - 0.5, lambdaMax = wavelength + 0.5;
 	double start = std::max(lambdaMin, OceanWavelengths[0]);
@@ -67,7 +71,7 @@ std::complex<double> BrineIOR(double wavelength) {
 	const double n8 = -4382.0;
 	const double n9 = 1.1455e6;
 	const double T = 20.0;
-	const double S = 0.35;
+	const double S = 0.0;
 	double brineN = 1.31405 + (n1 + n2 * T + n3 * pow(T, 2.0)) * S + n4 * pow(T, 2.0) + ((n5 + n6 * S + n7 * T) / wavelength) + (n8 / pow(wavelength, 2.0)) + (n9 / pow(wavelength, 3.0));
 
 	return std::complex<double>(brineN, brineK);
@@ -347,6 +351,12 @@ std::complex<double> CopperIOR(double wavelength) {
 		K = result / (lambdaMax - lambdaMin);
 	}
 	return std::complex<double>(N, K);
+}
+
+std::complex<double> Silica(double wavelength) {
+    int index = int(((wavelength - 390.0) / 441.0) * 77.0);
+    
+    return std::complex<double>(SilicaN[index], SilicaK[index]);
 }
 
 std::complex<double> AirIOR(double wavelength) {
